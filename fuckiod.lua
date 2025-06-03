@@ -369,6 +369,374 @@ function NotificationManager:notify(title, message, notificationType, duration)
     return notification
 end
 
+ -- Watermark Manager Class
+local WatermarkManager = {}
+WatermarkManager.__index = WatermarkManager
+
+function WatermarkManager.new(library)
+    local self = setmetatable({}, WatermarkManager)
+    self.library = library
+    self.isVisible = true
+    self.container = nil
+    self.updateConnection = nil
+    self.lastUpdate = tick()
+    self.frameCount = 0
+    self.fps = 0
+    
+    self:createWatermark()
+    self:startUpdating()
+    
+    return self
+end
+
+function WatermarkManager:createWatermark()
+    -- Create watermark ScreenGui
+    local watermarkGui = safeCreate("ScreenGui", {
+        Name = "LynixWatermark_" .. math.random(10000, 99999),
+        ResetOnSpawn = false,
+        IgnoreGuiInset = true,
+        Parent = CoreGui
+    })
+    
+    if not watermarkGui then return end
+    
+    -- Main watermark container
+    self.container = safeCreate("Frame", {
+        Name = "WatermarkContainer",
+        Size = UDim2.new(0, 320, 0, 80),
+        Position = UDim2.new(0, 20, 0, 20),
+        BackgroundColor3 = THEME.Background,
+        BorderSizePixel = 0,
+        Parent = watermarkGui
+    })
+    
+    if not self.container then return end
+    
+    -- Styling
+    local containerCorner = safeCreate("UICorner", {
+        CornerRadius = UDim.new(0, 12),
+        Parent = self.container
+    })
+    
+    local containerStroke = safeCreate("UIStroke", {
+        Color = THEME.Border,
+        Thickness = 1,
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+        Parent = self.container
+    })
+    
+    -- Gradient background
+    local gradient = safeCreate("UIGradient", {
+        Color = ColorSequence.new{
+            ColorSequenceKeypoint.new(0, THEME.Background),
+            ColorSequenceKeypoint.new(1, THEME.Surface)
+        },
+        Rotation = 45,
+        Parent = self.container
+    })
+    
+    -- Accent line (top)
+    local accentLine = safeCreate("Frame", {
+        Size = UDim2.new(1, 0, 0, 3),
+        Position = UDim2.new(0, 0, 0, 0),
+        BackgroundColor3 = THEME.Primary,
+        BorderSizePixel = 0,
+        Parent = self.container
+    })
+    
+    if accentLine then
+        local accentCorner = safeCreate("UICorner", {
+            CornerRadius = UDim.new(0, 12),
+            Parent = accentLine
+        })
+        
+        -- Fix corners for top only
+        local accentFix = safeCreate("Frame", {
+            Size = UDim2.new(1, 0, 0, 6),
+            Position = UDim2.new(0, 0, 1, -3),
+            BackgroundColor3 = THEME.Primary,
+            BorderSizePixel = 0,
+            Parent = accentLine
+        })
+    end
+    
+    -- Brand section (Lynix)
+    local brandFrame = safeCreate("Frame", {
+        Size = UDim2.new(0, 100, 1, -10),
+        Position = UDim2.new(0, 15, 0, 8),
+        BackgroundTransparency = 1,
+        Parent = self.container
+    })
+    
+    if brandFrame then
+        -- Lynix logo/text
+        local brandText = safeCreate("TextLabel", {
+            Size = UDim2.new(1, 0, 0, 25),
+            Position = UDim2.new(0, 0, 0, 5),
+            BackgroundTransparency = 1,
+            Text = "Lynix",
+            TextColor3 = THEME.Primary,
+            TextSize = 18,
+            Font = Enum.Font.GothamBold,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Center,
+            Parent = brandFrame
+        })
+        
+        -- Version/subtitle
+        local versionText = safeCreate("TextLabel", {
+            Size = UDim2.new(1, 0, 0, 15),
+            Position = UDim2.new(0, 0, 0, 30),
+            BackgroundTransparency = 1,
+            Text = "v1.0 • Premium",
+            TextColor3 = THEME.TextSecondary,
+            TextSize = 11,
+            Font = Enum.Font.Gotham,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Center,
+            Parent = brandFrame
+        })
+    end
+    
+    -- Stats section (Ping & FPS)
+    local statsFrame = safeCreate("Frame", {
+        Size = UDim2.new(0, 180, 1, -10),
+        Position = UDim2.new(1, -195, 0, 8),
+        BackgroundTransparency = 1,
+        Parent = self.container
+    })
+    
+    if statsFrame then
+        -- FPS Display
+        self.fpsLabel = safeCreate("TextLabel", {
+            Size = UDim2.new(0.5, -5, 0, 25),
+            Position = UDim2.new(0, 0, 0, 5),
+            BackgroundTransparency = 1,
+            Text = "FPS: 60",
+            TextColor3 = THEME.Success,
+            TextSize = 14,
+            Font = Enum.Font.GothamBold,
+            TextXAlignment = Enum.TextXAlignment.Center,
+            TextYAlignment = Enum.TextYAlignment.Center,
+            Parent = statsFrame
+        })
+        
+        -- Ping Display
+        self.pingLabel = safeCreate("TextLabel", {
+            Size = UDim2.new(0.5, -5, 0, 25),
+            Position = UDim2.new(0.5, 5, 0, 5),
+            BackgroundTransparency = 1,
+            Text = "Ping: 0ms",
+            TextColor3 = THEME.Accent,
+            TextSize = 14,
+            Font = Enum.Font.GothamBold,
+            TextXAlignment = Enum.TextXAlignment.Center,
+            TextYAlignment = Enum.TextYAlignment.Center,
+            Parent = statsFrame
+        })
+        
+        -- Performance indicator bars
+        local fpsBar = safeCreate("Frame", {
+            Size = UDim2.new(0.5, -10, 0, 4),
+            Position = UDim2.new(0, 5, 0, 35),
+            BackgroundColor3 = THEME.Success,
+            BorderSizePixel = 0,
+            Parent = statsFrame
+        })
+        
+        if fpsBar then
+            local fpsBarCorner = safeCreate("UICorner", {
+                CornerRadius = UDim.new(0, 2),
+                Parent = fpsBar
+            })
+            self.fpsBar = fpsBar
+        end
+        
+        local pingBar = safeCreate("Frame", {
+            Size = UDim2.new(0.5, -10, 0, 4),
+            Position = UDim2.new(0.5, 5, 0, 35),
+            BackgroundColor3 = THEME.Accent,
+            BorderSizePixel = 0,
+            Parent = statsFrame
+        })
+        
+        if pingBar then
+            local pingBarCorner = safeCreate("UICorner", {
+                CornerRadius = UDim.new(0, 2),
+                Parent = pingBar
+            })
+            self.pingBar = pingBar
+        end
+    end
+    
+    -- Draggable functionality
+    self.container.Active = true
+    self.container.Draggable = true
+    
+    -- Smooth entrance animation
+    self.container.Position = UDim2.new(0, -340, 0, 20)
+    TweenService:Create(self.container, ANIMATIONS.Bounce, {
+        Position = UDim2.new(0, 20, 0, 20)
+    }):Play()
+end
+
+function WatermarkManager:startUpdating()
+    -- FPS calculation
+    local lastTime = tick()
+    local frameBuffer = {}
+    local bufferSize = 30
+    
+    self.updateConnection = RunService.Heartbeat:Connect(function()
+        local currentTime = tick()
+        local deltaTime = currentTime - lastTime
+        lastTime = currentTime
+        
+        -- FPS calculation with smoothing
+        table.insert(frameBuffer, 1 / deltaTime)
+        if #frameBuffer > bufferSize then
+            table.remove(frameBuffer, 1)
+        end
+        
+        local averageFPS = 0
+        for _, fps in ipairs(frameBuffer) do
+            averageFPS = averageFPS + fps
+        end
+        averageFPS = math.floor(averageFPS / #frameBuffer)
+        
+        -- Update every 0.5 seconds for performance
+        if currentTime - self.lastUpdate >= 0.5 then
+            self:updateStats(averageFPS)
+            self.lastUpdate = currentTime
+        end
+    end)
+end
+
+function WatermarkManager:updateStats(fps)
+    if not self.fpsLabel or not self.pingLabel then return end
+    
+    -- Update FPS
+    self.fps = fps
+    self.fpsLabel.Text = "FPS: " .. tostring(fps)
+    
+    -- FPS color coding
+    local fpsColor = THEME.Success
+    if fps < 30 then
+        fpsColor = THEME.Error
+    elseif fps < 50 then
+        fpsColor = THEME.Warning
+    end
+    
+    self.fpsLabel.TextColor3 = fpsColor
+    if self.fpsBar then
+        self.fpsBar.BackgroundColor3 = fpsColor
+        -- Scale bar based on FPS (0-120 range)
+        local fpsScale = math.clamp(fps / 120, 0.1, 1)
+        TweenService:Create(self.fpsBar, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {
+            Size = UDim2.new(fpsScale * 0.5, -10, 0, 4)
+        }):Play()
+    end
+    
+    -- Update Ping
+    local ping = self:getPing()
+    self.pingLabel.Text = "Ping: " .. tostring(ping) .. "ms"
+    
+    -- Ping color coding
+    local pingColor = THEME.Success
+    if ping > 150 then
+        pingColor = THEME.Error
+    elseif ping > 80 then
+        pingColor = THEME.Warning
+    end
+    
+    self.pingLabel.TextColor3 = pingColor
+    if self.pingBar then
+        self.pingBar.BackgroundColor3 = pingColor
+        -- Scale bar based on ping (inverse - lower ping = fuller bar)
+        local pingScale = math.clamp(1 - (ping / 300), 0.1, 1)
+        TweenService:Create(self.pingBar, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {
+            Size = UDim2.new(pingScale * 0.5, -10, 0, 4)
+        }):Play()
+    end
+end
+
+function WatermarkManager:getPing()
+    -- Roblox ping calculation
+    local ping = 0
+    pcall(function()
+        local networkStats = game:GetService("Stats").Network
+        if networkStats and networkStats.ServerStatsItem then
+            local serverStats = networkStats.ServerStatsItem["Data Ping"]
+            if serverStats then
+                ping = math.floor(serverStats:GetValue())
+            end
+        end
+    end)
+    
+    -- Fallback method if above doesn't work
+    if ping == 0 then
+        pcall(function()
+            local replicatedStorage = game:GetService("ReplicatedStorage")
+            local statsService = game:GetService("Stats")
+            if statsService.Network then
+                ping = math.floor(statsService.Network.ServerStatsItem["Data Ping"]:GetValueString():match("%d+") or 0)
+            end
+        end)
+    end
+    
+    return ping
+end
+
+function WatermarkManager:setVisible(visible)
+    if not self.container then return end
+    
+    self.isVisible = visible
+    
+    if visible then
+        self.container.Visible = true
+        TweenService:Create(self.container, ANIMATIONS.Medium, {
+            Position = UDim2.new(0, 20, 0, 20),
+            Size = UDim2.new(0, 320, 0, 80),
+            BackgroundTransparency = 0
+        }):Play()
+    else
+        TweenService:Create(self.container, ANIMATIONS.Medium, {
+            Position = UDim2.new(0, -340, 0, 20),
+            Size = UDim2.new(0, 0, 0, 0),
+            BackgroundTransparency = 1
+        }):Play()
+        
+        task.spawn(function()
+            task.wait(0.3)
+            if self.container then
+                self.container.Visible = false
+            end
+        end)
+    end
+end
+
+function WatermarkManager:destroy()
+    if self.updateConnection then
+        self.updateConnection:Disconnect()
+        self.updateConnection = nil
+    end
+    
+    if self.container and self.container.Parent then
+        local watermarkGui = self.container.Parent
+        TweenService:Create(self.container, ANIMATIONS.Medium, {
+            Position = UDim2.new(0, -340, 0, 20),
+            Rotation = -15,
+            Size = UDim2.new(0, 0, 0, 0)
+        }):Play()
+        
+        task.spawn(function()
+            task.wait(0.3)
+            if watermarkGui then
+                watermarkGui:Destroy()
+            end
+        end)
+    end
+end
+
 -- Main GUI Library
 local GuiLibrary = {}
 GuiLibrary.__index = GuiLibrary
@@ -390,6 +758,7 @@ function GuiLibrary.new(title)
         toggle = "RightShift"
     }
     self.notificationManager = NotificationManager.new()
+    self.watermarkManager = WatermarkManager.new(self)
     self.connections = {}
     
     self:createGUI()
@@ -622,6 +991,14 @@ function GuiLibrary:createSettingsTab()
         self:Notify("Keybind Updated", "GUI toggle set to " .. newKey, "success")
     end)
     
+    -- Watermark Toggle
+    guiSection:CreateToggle("Show Watermark", self.watermarkManager.isVisible, function(enabled)
+        self.watermarkManager:setVisible(enabled)
+        local status = enabled and "enabled" or "disabled"
+        self:Notify("Watermark " .. (enabled and "Enabled" or "Disabled"), 
+                   "Watermark display has been " .. status, 
+                   enabled and "success" or "info")
+    end)
     -- Move settings tab button to bottom left with gear icon
     if settingsTab.button then
         -- Update button styling for settings
@@ -1893,6 +2270,11 @@ function GuiLibrary:hide()
         BackgroundTransparency = 1
     }):Play()
     
+    -- Hide watermark when GUI is hidden
+    if self.watermarkManager then
+        self.watermarkManager:setVisible(false)
+    end
+    
     task.spawn(function()
         task.wait(0.3)
         if self.backdrop then
@@ -1916,6 +2298,11 @@ function GuiLibrary:show()
     TweenService:Create(self.backdrop, ANIMATIONS.Medium, {
         BackgroundTransparency = 0.7
     }):Play()
+    
+    -- Show watermark when GUI is shown (if it was enabled)
+    if self.watermarkManager and self.watermarkManager.isVisible then
+        self.watermarkManager:setVisible(true)
+    end
 end
 
 function GuiLibrary:setupKeybinds()
@@ -1955,6 +2342,11 @@ function GuiLibrary:destroy()
         if notifGui then
             notifGui:Destroy()
         end
+    end
+
+    -- Cleanup watermark manager
+    if self.watermarkManager then
+        self.watermarkManager:destroy()
     end
     
     -- Animate and destroy main GUI
