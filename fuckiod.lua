@@ -401,15 +401,14 @@ function WatermarkManager:createWatermark()
     if not watermarkGui then return end
     
     -- Main watermark container
-    self.container = safeCreate("Frame", {
-        Name = "WatermarkContainer",
-        Size = UDim2.new(0, 320, 0, 80),
-        Position = UDim2.new(0, 20, 0, 20),
-        BackgroundColor3 = THEME.Background,
-        BorderSizePixel = 0,
-        Parent = watermarkGui
-    })
-    
+self.container = safeCreate("Frame", {
+    Name = "WatermarkContainer",
+    Size = UDim2.new(0, 320, 0, 65),
+    Position = UDim2.new(1, -340, 0, 20),
+    BackgroundColor3 = Color3.fromRGB(28, 28, 32),
+    BorderSizePixel = 0,
+    Parent = watermarkGui
+})
     if not self.container then return end
     
     -- Styling
@@ -426,14 +425,14 @@ function WatermarkManager:createWatermark()
     })
     
     -- Gradient background
-    local gradient = safeCreate("UIGradient", {
-        Color = ColorSequence.new{
-            ColorSequenceKeypoint.new(0, THEME.Background),
-            ColorSequenceKeypoint.new(1, THEME.Surface)
-        },
-        Rotation = 45,
-        Parent = self.container
-    })
+local gradient = safeCreate("UIGradient", {
+    Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(28, 28, 32)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(38, 38, 42))
+    },
+    Rotation = 45,
+    Parent = self.container
+})
     
     -- Accent line (top)
     local accentLine = safeCreate("Frame", {
@@ -499,12 +498,12 @@ function WatermarkManager:createWatermark()
     end
     
     -- Stats section (Ping & FPS)
-    local statsFrame = safeCreate("Frame", {
-        Size = UDim2.new(0, 180, 1, -10),
-        Position = UDim2.new(1, -195, 0, 8),
-        BackgroundTransparency = 1,
-        Parent = self.container
-    })
+local statsFrame = safeCreate("Frame", {
+    Size = UDim2.new(0, 180, 1, -5),
+    Position = UDim2.new(1, -190, 0, 5),
+    BackgroundTransparency = 1,
+    Parent = self.container
+})
     
     if statsFrame then
         -- FPS Display
@@ -574,10 +573,10 @@ function WatermarkManager:createWatermark()
     self.container.Draggable = true
     
     -- Smooth entrance animation
-    self.container.Position = UDim2.new(0, -340, 0, 20)
-    TweenService:Create(self.container, ANIMATIONS.Bounce, {
-        Position = UDim2.new(0, 20, 0, 20)
-    }):Play()
+self.container.Position = UDim2.new(1, 20, 0, 20)
+TweenService:Create(self.container, ANIMATIONS.Bounce, {
+    Position = UDim2.new(1, -340, 0, 20)
+}):Play()
 end
 
 function WatermarkManager:startUpdating()
@@ -694,13 +693,13 @@ function WatermarkManager:setVisible(visible)
     if visible then
         self.container.Visible = true
         TweenService:Create(self.container, ANIMATIONS.Medium, {
-            Position = UDim2.new(0, 20, 0, 20),
-            Size = UDim2.new(0, 320, 0, 80),
+            Position = UDim2.new(1, -340, 0, 20),
+            Size = UDim2.new(0, 320, 0, 65),
             BackgroundTransparency = 0
         }):Play()
     else
         TweenService:Create(self.container, ANIMATIONS.Medium, {
-            Position = UDim2.new(0, -340, 0, 20),
+            Position = UDim2.new(1, 20, 0, 20),
             Size = UDim2.new(0, 0, 0, 0),
             BackgroundTransparency = 1
         }):Play()
@@ -722,11 +721,11 @@ function WatermarkManager:destroy()
     
     if self.container and self.container.Parent then
         local watermarkGui = self.container.Parent
-        TweenService:Create(self.container, ANIMATIONS.Medium, {
-            Position = UDim2.new(0, -340, 0, 20),
-            Rotation = -15,
-            Size = UDim2.new(0, 0, 0, 0)
-        }):Play()
+TweenService:Create(self.container, ANIMATIONS.Medium, {
+    Position = UDim2.new(1, 20, 0, 20),
+    Rotation = -15,
+    Size = UDim2.new(0, 0, 0, 0)
+}):Play()
         
         task.spawn(function()
             task.wait(0.3)
@@ -2270,10 +2269,6 @@ function GuiLibrary:hide()
         BackgroundTransparency = 1
     }):Play()
     
-    -- Hide watermark when GUI is hidden
-    if self.watermarkManager then
-        self.watermarkManager:setVisible(false)
-    end
     
     task.spawn(function()
         task.wait(0.3)
@@ -2299,11 +2294,6 @@ function GuiLibrary:show()
         BackgroundTransparency = 0.7
     }):Play()
     
-    -- Show watermark when GUI is shown (if it was enabled)
-    if self.watermarkManager and self.watermarkManager.isVisible then
-        self.watermarkManager:setVisible(true)
-    end
-end
 
 function GuiLibrary:setupKeybinds()
     -- Disconnect existing keybind
