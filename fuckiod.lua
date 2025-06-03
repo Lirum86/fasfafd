@@ -2293,7 +2293,7 @@ function GuiLibrary:show()
     TweenService:Create(self.backdrop, ANIMATIONS.Medium, {
         BackgroundTransparency = 0.7
     }):Play()
-    
+end
 
 function GuiLibrary:setupKeybinds()
     -- Disconnect existing keybind
