@@ -307,7 +307,7 @@ function NotificationManager:notify(title, message, notificationType, duration)
     
     -- Close Button
     local closeBtn = safeCreate("TextButton", {
-        Size = UDim2.new(0, 20, 0, 20),
+        Size = UDim2.new(28, 28, 32),
         Position = UDim2.new(1, -30, 0, 10),
         BackgroundTransparency = 1,
         Text = "×",
