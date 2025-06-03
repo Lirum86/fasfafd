@@ -405,7 +405,7 @@ self.container = safeCreate("Frame", {
     Name = "WatermarkContainer",
     Size = UDim2.new(0, 320, 0, 65),
     Position = UDim2.new(1, -340, 0, 20),
-    BackgroundColor3 = Color3.fromRGB(28, 28, 32),
+    BackgroundColor3 = Color3.fromRGB(45, 45, 50),
     BorderSizePixel = 0,
     Parent = watermarkGui
 })
@@ -427,8 +427,8 @@ self.container = safeCreate("Frame", {
     -- Gradient background
 local gradient = safeCreate("UIGradient", {
     Color = ColorSequence.new{
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(28, 28, 32)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(38, 38, 42))
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(45, 45, 50)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(55, 55, 60))
     },
     Rotation = 45,
     Parent = self.container
@@ -506,10 +506,10 @@ local statsFrame = safeCreate("Frame", {
 })
     
     if statsFrame then
-        -- FPS Display
+ -- FPS Display
         self.fpsLabel = safeCreate("TextLabel", {
             Size = UDim2.new(0.5, -5, 0, 25),
-            Position = UDim2.new(0, 0, 0, 5),
+            Position = UDim2.new(0, 0, 0, 15),
             BackgroundTransparency = 1,
             Text = "FPS: 60",
             TextColor3 = THEME.Success,
@@ -523,7 +523,7 @@ local statsFrame = safeCreate("Frame", {
         -- Ping Display
         self.pingLabel = safeCreate("TextLabel", {
             Size = UDim2.new(0.5, -5, 0, 25),
-            Position = UDim2.new(0.5, 5, 0, 5),
+            Position = UDim2.new(0.5, 5, 0, 15),
             BackgroundTransparency = 1,
             Text = "Ping: 0ms",
             TextColor3 = THEME.Accent,
@@ -537,7 +537,7 @@ local statsFrame = safeCreate("Frame", {
         -- Performance indicator bars
         local fpsBar = safeCreate("Frame", {
             Size = UDim2.new(0.5, -10, 0, 4),
-            Position = UDim2.new(0, 5, 0, 35),
+            Position = UDim2.new(0, 5, 0, 45),
             BackgroundColor3 = THEME.Success,
             BorderSizePixel = 0,
             Parent = statsFrame
@@ -553,7 +553,7 @@ local statsFrame = safeCreate("Frame", {
         
         local pingBar = safeCreate("Frame", {
             Size = UDim2.new(0.5, -10, 0, 4),
-            Position = UDim2.new(0.5, 5, 0, 35),
+            Position = UDim2.new(0.5, 5, 0, 45),
             BackgroundColor3 = THEME.Accent,
             BorderSizePixel = 0,
             Parent = statsFrame
@@ -692,6 +692,7 @@ function WatermarkManager:setVisible(visible)
     
     if visible then
         self.container.Visible = true
+        self.container.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
         TweenService:Create(self.container, ANIMATIONS.Medium, {
             Position = UDim2.new(1, -340, 0, 20),
             Size = UDim2.new(0, 320, 0, 65),
