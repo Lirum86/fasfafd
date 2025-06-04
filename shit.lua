@@ -1061,6 +1061,193 @@ function GuiLibrary:createSettingsTab()
     end
 end
 
+-- Textbox Element erstellen
+function GuiLibrary:createTextbox(parent, title, placeholder, default, yPos, callback)
+    local container = safeCreate("Frame", {
+        Size = UDim2.new(1, -20, 0, 70),
+        Position = UDim2.new(0, 10, 0, yPos),
+        BackgroundColor3 = THEME.Surface,
+        BorderSizePixel = 0,
+        Parent = parent
+    })
+    
+    if container then
+        local containerCorner = safeCreate("UICorner", {
+            CornerRadius = UDim.new(0, 10),
+            Parent = container
+        })
+        
+        local borderStroke = safeCreate("UIStroke", {
+            Color = THEME.Border,
+            Thickness = 1,
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+            Parent = container
+        })
+        
+        local titleLabel = safeCreate("TextLabel", {
+            Size = UDim2.new(0.4, 0, 1, 0),
+            Position = UDim2.new(0, 20, 0, 0),
+            BackgroundTransparency = 1,
+            Text = title,
+            TextColor3 = THEME.Text,
+            TextSize = 14,
+            Font = Enum.Font.GothamMedium,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Center,
+            Parent = container
+        })
+        
+        local textboxBG = safeCreate("Frame", {
+            Size = UDim2.new(0, 200, 0, 35),
+            Position = UDim2.new(1, -220, 0.5, -17.5),
+            BackgroundColor3 = THEME.SurfaceLight,
+            BorderSizePixel = 0,
+            Parent = container
+        })
+        
+        if textboxBG then
+            local textboxCorner = safeCreate("UICorner", {
+                CornerRadius = UDim.new(0, 8),
+                Parent = textboxBG
+            })
+            
+            local textboxStroke = safeCreate("UIStroke", {
+                Color = THEME.Border,
+                Thickness = 1,
+                ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+                Parent = textboxBG
+            })
+            
+            local textbox = safeCreate("TextBox", {
+                Size = UDim2.new(1, -20, 1, 0),
+                Position = UDim2.new(0, 10, 0, 0),
+                BackgroundTransparency = 1,
+                Text = default or "",
+                PlaceholderText = placeholder or "Enter text...",
+                TextColor3 = THEME.Text,
+                PlaceholderColor3 = THEME.TextSecondary,
+                TextSize = 14,
+                Font = Enum.Font.Gotham,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                TextYAlignment = Enum.TextYAlignment.Center,
+                ClearButtonMode = Enum.ClearButtonMode.WhileEditing,
+                Parent = textboxBG
+            })
+            
+            if textbox then
+                textbox.FocusLost:Connect(function(enterPressed)
+                    if enterPressed and callback then
+                        callback(textbox.Text)
+                    end
+                end)
+                
+                textbox.Focused:Connect(function()
+                    TweenService:Create(textboxStroke, ANIMATIONS.Fast, {
+                        Color = THEME.Primary
+                    }):Play()
+                    TweenService:Create(container, ANIMATIONS.Fast, {
+                        BackgroundColor3 = THEME.SurfaceLight
+                    }):Play()
+                end)
+                
+                textbox.FocusLost:Connect(function()
+                    TweenService:Create(textboxStroke, ANIMATIONS.Fast, {
+                        Color = THEME.Border
+                    }):Play()
+                    TweenService:Create(container, ANIMATIONS.Fast, {
+                        BackgroundColor3 = THEME.Surface
+                    }):Play()
+                end)
+            end
+        end
+    end
+    
+    return container
+end
+
+-- Button Element erstellen
+function GuiLibrary:createButton(parent, title, yPos, callback)
+    local container = safeCreate("Frame", {
+        Size = UDim2.new(1, -20, 0, 70),
+        Position = UDim2.new(0, 10, 0, yPos),
+        BackgroundColor3 = THEME.Surface,
+        BorderSizePixel = 0,
+        Parent = parent
+    })
+    
+    if container then
+        local containerCorner = safeCreate("UICorner", {
+            CornerRadius = UDim.new(0, 10),
+            Parent = container
+        })
+        
+        local borderStroke = safeCreate("UIStroke", {
+            Color = THEME.Border,
+            Thickness = 1,
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+            Parent = container
+        })
+        
+        local button = safeCreate("TextButton", {
+            Size = UDim2.new(0, 250, 0, 45),
+            Position = UDim2.new(0.5, -125, 0.5, -22.5),
+            BackgroundColor3 = THEME.Primary,
+            BorderSizePixel = 0,
+            Text = title,
+            TextColor3 = Color3.fromRGB(255, 255, 255),
+            TextSize = 16,
+            Font = Enum.Font.GothamBold,
+            Parent = container
+        })
+        
+        if button then
+            local buttonCorner = safeCreate("UICorner", {
+                CornerRadius = UDim.new(0, 10),
+                Parent = button
+            })
+            
+            button.MouseEnter:Connect(function()
+                TweenService:Create(button, ANIMATIONS.Fast, {
+                    BackgroundColor3 = THEME.Accent,
+                    Size = UDim2.new(0, 255, 0, 47)
+                }):Play()
+                TweenService:Create(container, ANIMATIONS.Fast, {
+                    BackgroundColor3 = THEME.SurfaceLight
+                }):Play()
+            end)
+            
+            button.MouseLeave:Connect(function()
+                TweenService:Create(button, ANIMATIONS.Fast, {
+                    BackgroundColor3 = THEME.Primary,
+                    Size = UDim2.new(0, 250, 0, 45)
+                }):Play()
+                TweenService:Create(container, ANIMATIONS.Fast, {
+                    BackgroundColor3 = THEME.Surface
+                }):Play()
+            end)
+            
+            button.MouseButton1Click:Connect(function()
+                TweenService:Create(button, TweenInfo.new(0.1, Enum.EasingStyle.Quad), {
+                    Size = UDim2.new(0, 245, 0, 43)
+                }):Play()
+                
+                task.spawn(function()
+                    task.wait(0.1)
+                    TweenService:Create(button, TweenInfo.new(0.1, Enum.EasingStyle.Quad), {
+                        Size = UDim2.new(0, 250, 0, 45)
+                    }):Play()
+                end)
+                
+                if callback then
+                    callback()
+                end
+            end)
+        end
+    end
+    
+    return container
+end
+
 function GuiLibrary:CreateTab(name)
     local isValid, error = validateInput(name, "string")
     if not isValid then
@@ -1408,6 +1595,14 @@ function GuiLibrary:createElement(section, elementType, name, data, callback)
             pcall(callback, newValue)
         end)
     end
+
+    function section:CreateTextbox(name, placeholder, default, callback)
+    return self.tab.library:createElement(self, "textbox", name, {placeholder = placeholder, default = default}, callback)
+end
+
+function section:CreateButton(name, callback)
+    return self.tab.library:createElement(self, "button", name, nil, callback)
+end
     
     table.insert(section.elements, element)
     
