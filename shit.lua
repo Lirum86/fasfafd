@@ -2294,6 +2294,230 @@ function GuiLibrary:createKeybind(parent, title, default, yPos, callback)
     return container
 end
 
+-- ========== FÜGEN SIE DIESE FUNKTIONEN IN IHRE LIBRARY EIN ==========
+-- Fügen Sie diese DIREKT VOR "function GuiLibrary:switchToTab(tab)" ein
+
+function GuiLibrary:createTextInput(parent, title, placeholder, yPos, callback)
+    local container = safeCreate("Frame", {
+        Size = UDim2.new(1, -20, 0, 70),
+        Position = UDim2.new(0, 10, 0, yPos),
+        BackgroundColor3 = THEME.Surface,
+        BorderSizePixel = 0,
+        Parent = parent
+    })
+    
+    if container then
+        local containerCorner = safeCreate("UICorner", {
+            CornerRadius = UDim.new(0, 10),
+            Parent = container
+        })
+        
+        local borderStroke = safeCreate("UIStroke", {
+            Color = THEME.Border,
+            Thickness = 1,
+            ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+            Parent = container
+        })
+        
+        local titleLabel = safeCreate("TextLabel", {
+            Size = UDim2.new(0.3, 0, 1, 0),
+            Position = UDim2.new(0, 20, 0, 0),
+            BackgroundTransparency = 1,
+            Text = title,
+            TextColor3 = THEME.Text,
+            TextSize = 14,
+            Font = Enum.Font.GothamMedium,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            TextYAlignment = Enum.TextYAlignment.Center,
+            Parent = container
+        })
+        
+        local inputBox = safeCreate("TextBox", {
+            Size = UDim2.new(0.65, -20, 0, 35),
+            Position = UDim2.new(0.35, 0, 0.5, -17.5),
+            BackgroundColor3 = THEME.SurfaceLight,
+            BorderSizePixel = 0,
+            Text = "",
+            PlaceholderText = placeholder,
+            PlaceholderColor3 = THEME.TextSecondary,
+            TextColor3 = THEME.Text,
+            TextSize = 14,
+            Font = Enum.Font.Gotham,
+            TextXAlignment = Enum.TextXAlignment.Left,
+            ClearTextOnFocus = false,
+            Parent = container
+        })
+        
+        if inputBox then
+            local inputCorner = safeCreate("UICorner", {
+                CornerRadius = UDim.new(0, 8),
+                Parent = inputBox
+            })
+            
+            local inputStroke = safeCreate("UIStroke", {
+                Color = THEME.Border,
+                Thickness = 1,
+                ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+                Parent = inputBox
+            })
+            
+            local inputPadding = safeCreate("UIPadding", {
+                PaddingLeft = UDim.new(0, 10),
+                PaddingRight = UDim.new(0, 10),
+                Parent = inputBox
+            })
+            
+            inputBox.FocusLost:Connect(function()
+                callback(inputBox.Text)
+            end)
+            
+            inputBox.Focused:Connect(function()
+                TweenService:Create(inputStroke, ANIMATIONS.Fast, {
+                    Color = THEME.Primary
+                }):Play()
+            end)
+            
+            inputBox.FocusLost:Connect(function()
+                TweenService:Create(inputStroke, ANIMATIONS.Fast, {
+                    Color = THEME.Border
+                }):Play()
+            end)
+        end
+    end
+    
+    return container
+end
+
+function GuiLibrary:createButton(parent, title, yPos, color, callback)
+    local container = safeCreate("Frame", {
+        Size = UDim2.new(1, -20, 0, 70),
+        Position = UDim2.new(0, 10, 0, yPos),
+        BackgroundTransparency = 1,
+        Parent = parent
+    })
+    
+    if container then
+        local button = safeCreate("TextButton", {
+            Size = UDim2.new(1, -40, 0, 45),
+            Position = UDim2.new(0, 20, 0.5, -22.5),
+            BackgroundColor3 = color,
+            BorderSizePixel = 0,
+            Text = title,
+            TextColor3 = Color3.fromRGB(255, 255, 255),
+            TextSize = 14,
+            Font = Enum.Font.GothamBold,
+            Parent = container
+        })
+        
+        if button then
+            local buttonCorner = safeCreate("UICorner", {
+                CornerRadius = UDim.new(0, 10),
+                Parent = button
+            })
+            
+            button.MouseEnter:Connect(function()
+                local hoverColor = Color3.fromRGB(
+                    math.min(color.R * 255 + 20, 255),
+                    math.min(color.G * 255 + 20, 255),
+                    math.min(color.B * 255 + 20, 255)
+                )
+                TweenService:Create(button, ANIMATIONS.Fast, {
+                    BackgroundColor3 = hoverColor,
+                    Size = UDim2.new(1, -35, 0, 47)
+                }):Play()
+            end)
+            
+            button.MouseLeave:Connect(function()
+                TweenService:Create(button, ANIMATIONS.Fast, {
+                    BackgroundColor3 = color,
+                    Size = UDim2.new(1, -40, 0, 45)
+                }):Play()
+            end)
+            
+            button.MouseButton1Click:Connect(function()
+                TweenService:Create(button, TweenInfo.new(0.1, Enum.EasingStyle.Quad), {
+                    Size = UDim2.new(1, -45, 0, 42)
+                }):Play()
+                
+                task.wait(0.1)
+                
+                TweenService:Create(button, TweenInfo.new(0.1, Enum.EasingStyle.Quad), {
+                    Size = UDim2.new(1, -40, 0, 45)
+                }):Play()
+                
+                callback()
+            end)
+        end
+    end
+    
+    return container
+end
+
+function GuiLibrary:createActionButton(parent, title, xPos, color, callback)
+    local button = safeCreate("TextButton", {
+        Size = UDim2.new(0, 75, 0, 35),
+        Position = UDim2.new(0, xPos, 0, 0),
+        BackgroundColor3 = color,
+        BorderSizePixel = 0,
+        Text = title,
+        TextColor3 = Color3.fromRGB(255, 255, 255),
+        TextSize = 12,
+        Font = Enum.Font.GothamBold,
+        Parent = parent
+    })
+    
+    if button then
+        local buttonCorner = safeCreate("UICorner", {
+            CornerRadius = UDim.new(0, 8),
+            Parent = button
+        })
+        
+        button.MouseEnter:Connect(function()
+            local hoverColor = Color3.fromRGB(
+                math.min(color.R * 255 + 25, 255),
+                math.min(color.G * 255 + 25, 255),
+                math.min(color.B * 255 + 25, 255)
+            )
+            TweenService:Create(button, ANIMATIONS.Fast, {
+                BackgroundColor3 = hoverColor,
+                Size = UDim2.new(0, 77, 0, 37)
+            }):Play()
+        end)
+        
+        button.MouseLeave:Connect(function()
+            TweenService:Create(button, ANIMATIONS.Fast, {
+                BackgroundColor3 = color,
+                Size = UDim2.new(0, 75, 0, 35)
+            }):Play()
+        end)
+        
+        button.MouseButton1Click:Connect(function()
+            TweenService:Create(button, TweenInfo.new(0.1, Enum.EasingStyle.Quad), {
+                Size = UDim2.new(0, 72, 0, 32)
+            }):Play()
+            
+            task.wait(0.1)
+            
+            TweenService:Create(button, TweenInfo.new(0.1, Enum.EasingStyle.Quad), {
+                Size = UDim2.new(0, 75, 0, 35)
+            }):Play()
+            
+            callback()
+        end)
+    end
+    
+    return button
+end
+
+function GuiLibrary:updateConfigDropdown()
+    if self.configElements and self.configElements.dropdown then
+        local configNames = self.configManager:getConfigNames()
+        self:Notify("Config System", "Config list updated", "info", 2)
+    end
+end
+
+-- ========== ENDE DER FEHLENDEN FUNKTIONEN ==========
+
 function GuiLibrary:switchToTab(tab)
     if self.currentTab == tab then return end
     
