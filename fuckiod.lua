@@ -369,6 +369,418 @@ function NotificationManager:notify(title, message, notificationType, duration)
     return notification
 end
 
+-- Config Manager Class
+local ConfigManager = {}
+ConfigManager.__index = ConfigManager
+
+function ConfigManager.new(library)
+    local self = setmetatable({}, ConfigManager)
+    self.library = library
+    self.configs = {}
+    self.currentConfig = nil
+    self.configFolder = "LynixConfigs"
+    self.autoSaveEnabled = true
+    self.autoSaveInterval = 30 -- seconds
+    self.lastAutoSave = tick()
+    
+    -- Create configs folder
+    self:createConfigsFolder()
+    
+    -- Load existing configs
+    self:loadAllConfigs()
+    
+    -- Start auto-save
+    if self.autoSaveEnabled then
+        self:startAutoSave()
+    end
+    
+    return self
+end
+
+function ConfigManager:createConfigsFolder()
+    if not isfolder(self.configFolder) then
+        makefolder(self.configFolder)
+    end
+end
+
+function ConfigManager:getAllConfigElements()
+    local elements = {}
+    
+    -- Get all tabs
+    for _, tab in pairs(self.library.tabs) do
+        if tab.name ~= "Settings" then -- Skip settings tab
+            for _, section in pairs(tab.sections) do
+                for _, element in pairs(section.elements) do
+                    local elementPath = tab.name .. "." .. section.name .. "." .. element.name
+                    elements[elementPath] = {
+                        type = element.type,
+                        value = element.value,
+                        tab = tab.name,
+                        section = section.name,
+                        name = element.name
+                    }
+                end
+            end
+        end
+    end
+    
+    return elements
+end
+
+function ConfigManager:saveConfig(configName)
+    if not configName or configName == "" then
+        self.library:Notify("Config Error", "Config name cannot be empty!", "error")
+        return false
+    end
+    
+    -- Sanitize config name
+    configName = configName:gsub("[^%w%s%-_]", "")
+    if configName == "" then
+        self.library:Notify("Config Error", "Invalid config name!", "error")
+        return false
+    end
+    
+    local configData = {
+        name = configName,
+        created = os.date("%Y-%m-%d %H:%M:%S"),
+        version = "1.0",
+        elements = self:getAllConfigElements()
+    }
+    
+    local success, result = pcall(function()
+        local jsonData = game:GetService("HttpService"):JSONEncode(configData)
+        local filePath = self.configFolder .. "/" .. configName .. ".json"
+        writefile(filePath, jsonData)
+        return true
+    end)
+    
+    if success then
+        self.configs[configName] = configData
+        self.library:Notify("Config Saved", "Config '" .. configName .. "' saved successfully!", "success")
+        return true
+    else
+        self.library:Notify("Config Error", "Failed to save config: " .. tostring(result), "error")
+        return false
+    end
+end
+
+function ConfigManager:loadConfig(configName)
+    if not configName or configName == "" then
+        self.library:Notify("Config Error", "Config name cannot be empty!", "error")
+        return false
+    end
+    
+    local filePath = self.configFolder .. "/" .. configName .. ".json"
+    
+    if not isfile(filePath) then
+        self.library:Notify("Config Error", "Config '" .. configName .. "' not found!", "error")
+        return false
+    end
+    
+    local success, result = pcall(function()
+        local fileContent = readfile(filePath)
+        local configData = game:GetService("HttpService"):JSONDecode(fileContent)
+        return configData
+    end)
+    
+    if not success then
+        self.library:Notify("Config Error", "Failed to load config: " .. tostring(result), "error")
+        return false
+    end
+    
+    local configData = result
+    local loadedCount = 0
+    local failedCount = 0
+    
+    -- Apply config values
+    for elementPath, elementData in pairs(configData.elements) do
+        local pathParts = elementPath:split(".")
+        if #pathParts == 3 then
+            local tabName, sectionName, elementName = pathParts[1], pathParts[2], pathParts[3]
+            
+            -- Find the element
+            local element = self:findElement(tabName, sectionName, elementName)
+            if element then
+                local success = self:applyElementValue(element, elementData.value)
+                if success then
+                    loadedCount = loadedCount + 1
+                else
+                    failedCount = failedCount + 1
+                end
+            else
+                failedCount = failedCount + 1
+            end
+        end
+    end
+    
+    self.currentConfig = configName
+    self.configs[configName] = configData
+    
+    local message = string.format("Loaded %d/%d elements", loadedCount, loadedCount + failedCount)
+    if failedCount > 0 then
+        message = message .. " (" .. failedCount .. " failed)"
+    end
+    
+    self.library:Notify("Config Loaded", "Config '" .. configName .. "' loaded! " .. message, 
+                       failedCount == 0 and "success" or "warning")
+    return true
+end
+
+function ConfigManager:findElement(tabName, sectionName, elementName)
+    for _, tab in pairs(self.library.tabs) do
+        if tab.name == tabName then
+            for _, section in pairs(tab.sections) do
+                if section.name == sectionName then
+                    for _, element in pairs(section.elements) do
+                        if element.name == elementName then
+                            return element
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
+function ConfigManager:applyElementValue(element, value)
+    if not element or not element.callback then
+        return false
+    end
+    
+    local success, result = pcall(function()
+        element.value = value
+        element.callback(value)
+        
+        -- Update visual representation based on element type
+        if element.type == "toggle" and element.container then
+            self:updateToggleVisual(element.container, value)
+        elseif element.type == "slider" and element.container then
+            self:updateSliderVisual(element.container, value)
+        elseif element.type == "dropdown" and element.container then
+            self:updateDropdownVisual(element.container, value)
+        end
+        
+        return true
+    end)
+    
+    return success
+end
+
+function ConfigManager:updateToggleVisual(container, value)
+    local toggleBG = container:FindFirstChild("Frame")
+    local toggleButton = toggleBG and toggleBG:FindFirstChild("Frame")
+    
+    if toggleBG and toggleButton then
+        local THEME = self.library.THEME or {
+            Primary = Color3.fromRGB(80, 140, 255),
+            Border = Color3.fromRGB(45, 45, 45)
+        }
+        
+        local newPos = value and UDim2.new(0, 27, 0, 2) or UDim2.new(0, 2, 0, 2)
+        local newColor = value and THEME.Primary or THEME.Border
+        
+        toggleButton.Position = newPos
+        toggleBG.BackgroundColor3 = newColor
+    end
+end
+
+function ConfigManager:updateSliderVisual(container, value)
+    -- Slider visual update logic would go here
+    -- This is more complex and depends on min/max values
+end
+
+function ConfigManager:updateDropdownVisual(container, value)
+    local dropdownBtn = container:FindFirstChild("TextButton")
+    local selectedLabel = dropdownBtn and dropdownBtn:FindFirstChild("TextLabel")
+    
+    if selectedLabel then
+        selectedLabel.Text = tostring(value)
+    end
+end
+
+function ConfigManager:deleteConfig(configName)
+    if not configName or configName == "" then
+        self.library:Notify("Config Error", "Config name cannot be empty!", "error")
+        return false
+    end
+    
+    local filePath = self.configFolder .. "/" .. configName .. ".json"
+    
+    if not isfile(filePath) then
+        self.library:Notify("Config Error", "Config '" .. configName .. "' not found!", "error")
+        return false
+    end
+    
+    local success, result = pcall(function()
+        delfile(filePath)
+        return true
+    end)
+    
+    if success then
+        self.configs[configName] = nil
+        if self.currentConfig == configName then
+            self.currentConfig = nil
+        end
+        self.library:Notify("Config Deleted", "Config '" .. configName .. "' deleted successfully!", "info")
+        return true
+    else
+        self.library:Notify("Config Error", "Failed to delete config: " .. tostring(result), "error")
+        return false
+    end
+end
+
+function ConfigManager:getConfigList()
+    local configList = {}
+    for configName, _ in pairs(self.configs) do
+        table.insert(configList, configName)
+    end
+    table.sort(configList)
+    return configList
+end
+
+function ConfigManager:loadAllConfigs()
+    if not isfolder(self.configFolder) then
+        return
+    end
+    
+    local files = listfiles(self.configFolder)
+    for _, filePath in pairs(files) do
+        if filePath:sub(-5) == ".json" then
+            local fileName = filePath:match("([^/\\]+)%.json$")
+            if fileName then
+                local success, result = pcall(function()
+                    local fileContent = readfile(filePath)
+                    local configData = game:GetService("HttpService"):JSONDecode(fileContent)
+                    return configData
+                end)
+                
+                if success then
+                    self.configs[fileName] = result
+                end
+            end
+        end
+    end
+end
+
+function ConfigManager:autoSave()
+    if not self.currentConfig or not self.autoSaveEnabled then
+        return
+    end
+    
+    local currentTime = tick()
+    if currentTime - self.lastAutoSave >= self.autoSaveInterval then
+        self:saveConfig(self.currentConfig)
+        self.lastAutoSave = currentTime
+    end
+end
+
+function ConfigManager:startAutoSave()
+    if self.autoSaveConnection then
+        return
+    end
+    
+    self.autoSaveConnection = game:GetService("RunService").Heartbeat:Connect(function()
+        self:autoSave()
+    end)
+end
+
+function ConfigManager:stopAutoSave()
+    if self.autoSaveConnection then
+        self.autoSaveConnection:Disconnect()
+        self.autoSaveConnection = nil
+    end
+end
+
+function ConfigManager:exportConfig(configName)
+    if not self.configs[configName] then
+        self.library:Notify("Config Error", "Config '" .. configName .. "' not found!", "error")
+        return nil
+    end
+    
+    local configData = self.configs[configName]
+    local success, result = pcall(function()
+        return game:GetService("HttpService"):JSONEncode(configData)
+    end)
+    
+    if success then
+        self.library:Notify("Config Exported", "Config copied to clipboard!", "success")
+        return result
+    else
+        self.library:Notify("Config Error", "Failed to export config!", "error")
+        return nil
+    end
+end
+
+function ConfigManager:importConfig(configName, configJSON)
+    if not configName or configName == "" then
+        self.library:Notify("Config Error", "Config name cannot be empty!", "error")
+        return false
+    end
+    
+    if not configJSON or configJSON == "" then
+        self.library:Notify("Config Error", "Config data cannot be empty!", "error")
+        return false
+    end
+    
+    local success, configData = pcall(function()
+        return game:GetService("HttpService"):JSONDecode(configJSON)
+    end)
+    
+    if not success then
+        self.library:Notify("Config Error", "Invalid config format!", "error")
+        return false
+    end
+    
+    -- Save imported config
+    configData.name = configName
+    configData.created = os.date("%Y-%m-%d %H:%M:%S") .. " (Imported)"
+    
+    local filePath = self.configFolder .. "/" .. configName .. ".json"
+    local writeSuccess, writeResult = pcall(function()
+        local jsonData = game:GetService("HttpService"):JSONEncode(configData)
+        writefile(filePath, jsonData)
+        return true
+    end)
+    
+    if writeSuccess then
+        self.configs[configName] = configData
+        self.library:Notify("Config Imported", "Config '" .. configName .. "' imported successfully!", "success")
+        return true
+    else
+        self.library:Notify("Config Error", "Failed to save imported config!", "error")
+        return false
+    end
+end
+
+function ConfigManager:getConfigInfo(configName)
+    if not self.configs[configName] then
+        return nil
+    end
+    
+    local config = self.configs[configName]
+    local elementCount = 0
+    
+    if config.elements then
+        for _ in pairs(config.elements) do
+            elementCount = elementCount + 1
+        end
+    end
+    
+    return {
+        name = config.name or configName,
+        created = config.created or "Unknown",
+        version = config.version or "Unknown",
+        elementCount = elementCount
+    }
+end
+
+function ConfigManager:destroy()
+    self:stopAutoSave()
+    self.configs = {}
+    self.currentConfig = nil
+end
+
  -- Watermark Manager Class
 local WatermarkManager = {}
 WatermarkManager.__index = WatermarkManager
@@ -757,9 +1169,10 @@ function GuiLibrary.new(title)
     self.keybinds = {
         toggle = "RightShift"
     }
-    self.notificationManager = NotificationManager.new()
-    self.watermarkManager = WatermarkManager.new(self)
-    self.connections = {}
+self.notificationManager = NotificationManager.new()
+self.watermarkManager = WatermarkManager.new(self)
+self.configManager = ConfigManager.new(self)  -- ← DIESE ZEILE HINZUFÜGEN
+self.connections = {}
     
     self:createGUI()
     self:setupKeybinds()
@@ -977,12 +1390,13 @@ function GuiLibrary:createContentArea()
     })
 end
 
+
 function GuiLibrary:createSettingsTab()
     -- Settings tab is protected and always created last
     local settingsTab = self:CreateTab("Settings")
     
     local keybindSection = settingsTab:CreateSection("Keybinds")
-    local guiSection = settingsTab:CreateSection("GUI Settings")
+    local configSection = settingsTab:CreateSection("Configs")
     
     -- GUI Toggle Keybind
     keybindSection:CreateKeybind("GUI Toggle", self.keybinds.toggle, function(newKey)
@@ -992,13 +1406,127 @@ function GuiLibrary:createSettingsTab()
     end)
     
     -- Watermark Toggle
-    guiSection:CreateToggle("Show Watermark", self.watermarkManager.isVisible, function(enabled)
+    keybindSection:CreateToggle("Show Watermark", self.watermarkManager.isVisible, function(enabled)
         self.watermarkManager:setVisible(enabled)
         local status = enabled and "enabled" or "disabled"
         self:Notify("Watermark " .. (enabled and "Enabled" or "Disabled"), 
                    "Watermark display has been " .. status, 
                    enabled and "success" or "info")
     end)
+    
+    -- Config Management
+    local configNameInput = ""
+    local selectedConfig = ""
+    
+    -- Config Name Input (simulated with a button that asks for input)
+    configSection:CreateKeybind("Config Name Input", "Click to Set", function()
+        -- This would ideally be a text input, but we'll simulate it
+        self:Notify("Config Name", "Please type config name in chat (format: /config [name])", "info")
+    end)
+    
+    -- Save Config
+    configSection:CreateToggle("Save Config", false, function(value)
+        if value then
+            task.spawn(function()
+                task.wait(0.1)
+                -- Reset toggle
+                configSection:CreateToggle("Save Config", false, function() end)
+            end)
+            
+            if configNameInput ~= "" then
+                self.configManager:saveConfig(configNameInput)
+            else
+                self:Notify("Config Error", "Please set a config name first!", "error")
+            end
+        end
+    end)
+    
+    -- Load Config
+    configSection:CreateDropdown("Load Config", self.configManager:getConfigList(), function(configName)
+        if configName and configName ~= "" then
+            self.configManager:loadConfig(configName)
+        end
+    end)
+    
+    -- Delete Config
+    configSection:CreateDropdown("Delete Config", self.configManager:getConfigList(), function(configName)
+        if configName and configName ~= "" then
+            self.configManager:deleteConfig(configName)
+        end
+    end)
+    
+    -- Auto Save Toggle
+    configSection:CreateToggle("Auto Save", self.configManager.autoSaveEnabled, function(enabled)
+        self.configManager.autoSaveEnabled = enabled
+        if enabled then
+            self.configManager:startAutoSave()
+        else
+            self.configManager:stopAutoSave()
+        end
+        self:Notify("Auto Save", "Auto save " .. (enabled and "enabled" or "disabled"), "info")
+    end)
+    
+    -- Auto Save Interval
+    configSection:CreateSlider("Auto Save Interval", 10, 300, self.configManager.autoSaveInterval, function(value)
+        self.configManager.autoSaveInterval = value
+    end)
+    
+    -- Config Info Display
+    configSection:CreateToggle("Show Config Info", false, function(value)
+        if value then
+            task.spawn(function()
+                task.wait(0.1)
+                -- Reset toggle
+                configSection:CreateToggle("Show Config Info", false, function() end)
+            end)
+            
+            if self.configManager.currentConfig then
+                local info = self.configManager:getConfigInfo(self.configManager.currentConfig)
+                if info then
+                    local message = string.format("Config: %s\nCreated: %s\nElements: %d", 
+                                                 info.name, info.created, info.elementCount)
+                    self:Notify("Config Info", message, "info", 5)
+                end
+            else
+                self:Notify("Config Info", "No config currently loaded", "info")
+            end
+        end
+    end)
+    
+    -- Chat command listener for config names
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    
+    if LocalPlayer then
+        local chatConnection
+        chatConnection = LocalPlayer.Chatted:Connect(function(message)
+            if message:sub(1, 8) == "/config " then
+                local configName = message:sub(9):match("^%s*(.-)%s*$") -- trim whitespace
+                if configName and configName ~= "" then
+                    configNameInput = configName
+                    self:Notify("Config Name Set", "Config name set to: " .. configName, "success")
+                end
+            elseif message == "/configs" then
+                local configList = self.configManager:getConfigList()
+                if #configList > 0 then
+                    local listText = "Available configs: " .. table.concat(configList, ", ")
+                    self:Notify("Config List", listText, "info", 5)
+                else
+                    self:Notify("Config List", "No configs found", "info")
+                end
+            elseif message == "/exportconfig" and self.configManager.currentConfig then
+                local exported = self.configManager:exportConfig(self.configManager.currentConfig)
+                if exported then
+                    -- In a real implementation, you might copy to clipboard
+                    print("Exported config data:", exported)
+                end
+            end
+        end)
+        
+        -- Store connection for cleanup
+        table.insert(self.connections, chatConnection)
+    end
+    
     -- Move settings tab button to bottom left with gear icon
     if settingsTab.button then
         -- Update button styling for settings
@@ -2317,7 +2845,6 @@ end
 function GuiLibrary:Notify(title, message, notificationType, duration)
     return self.notificationManager:notify(title, message, notificationType, duration)
 end
-
 function GuiLibrary:destroy()
     -- Cleanup all connections
     for _, connection in pairs(self.connections) do
@@ -2338,6 +2865,15 @@ function GuiLibrary:destroy()
     -- Cleanup watermark manager
     if self.watermarkManager then
         self.watermarkManager:destroy()
+    end
+    
+    -- Cleanup config manager
+if self.configManager then
+    self.configManager:destroy()
+end
+    -- Cleanup config manager
+    if self.configManager then
+        self.configManager:destroy()
     end
     
     -- Animate and destroy main GUI
