@@ -139,6 +139,17 @@ function ConfigManager:registerElement(element)
         return
     end
     
+    -- Check if required properties exist
+    if not element.tab or not element.tab.name then
+        warn("Element missing tab information")
+        return
+    end
+    
+    if not element.section or not element.section.name then
+        warn("Element missing section information")
+        return
+    end
+    
     local elementId = element.tab.name .. "_" .. element.section.name .. "_" .. element.name .. "_" .. element.type
     self.configElements[elementId] = element
 end
@@ -159,16 +170,27 @@ function ConfigManager:saveCurrentConfig()
     -- Save all registered elements
     for elementId, element in pairs(self.configElements) do
         if element and element.value ~= nil then
-            configData.elements[elementId] = {
+            local elementData = {
                 value = element.value,
                 type = element.type
             }
+            
+            -- Special handling for Color3
+            if element.type == "colorpicker" and typeof(element.value) == "Color3" then
+                elementData.value = {
+                    r = element.value.R,
+                    g = element.value.G,
+                    b = element.value.B
+                }
+            end
+            
+            configData.elements[elementId] = elementData
         end
     end
     
     self.configs[self.currentConfig] = configData
     
-    -- Auto-save notification
+    -- Show notification
     if self.library and self.library.notificationManager then
         self.library:Notify("Config Saved", "Configuration '" .. self.currentConfig .. "' saved successfully", "success", 2)
     end
@@ -193,16 +215,27 @@ function ConfigManager:loadConfig(configName)
         
         if element and savedData.value ~= nil then
             local success = pcall(function()
+                local value = savedData.value
+                
+                -- Special handling for Color3
+                if savedData.type == "colorpicker" and type(value) == "table" and value.r then
+                    value = Color3.fromRGB(
+                        math.floor(value.r * 255),
+                        math.floor(value.g * 255),
+                        math.floor(value.b * 255)
+                    )
+                end
+                
                 -- Update element value
-                element.value = savedData.value
+                element.value = value
                 
                 -- Trigger callback
                 if element.callback and type(element.callback) == "function" then
-                    element.callback(savedData.value)
+                    element.callback(value)
                 end
                 
                 -- Update visual representation
-                self:updateElementVisual(element, savedData.value)
+                self:updateElementVisual(element, value)
             end)
             
             if success then
@@ -1067,16 +1100,32 @@ function GuiLibrary.new(title)
     self.keybinds = {
         toggle = "RightShift"
     }
-    self.notificationManager = NotificationManager.new()
-    self.watermarkManager = WatermarkManager.new(self)
-    self.configManager = ConfigManager.new(self)
+    
+    -- Initialize managers with error handling
+    local success, notifManager = pcall(function()
+        return NotificationManager.new()
+    end)
+    self.notificationManager = success and notifManager or nil
+    
+    local success2, watermarkManager = pcall(function()
+        return WatermarkManager.new(self)
+    end)
+    self.watermarkManager = success2 and watermarkManager or nil
+    
+    local success3, configManager = pcall(function()
+        return ConfigManager.new(self)
+    end)
+    self.configManager = success3 and configManager or nil
+    
     self.connections = {}
     
     self:createGUI()
     self:setupKeybinds()
     
-    -- Start auto-save
-    self.configManager:startAutoSave()
+    -- Start auto-save if config manager exists
+    if self.configManager then
+        self.configManager:startAutoSave()
+    end
     
     return self
 end
@@ -1295,8 +1344,18 @@ function GuiLibrary:createSettingsTab()
     -- Settings tab is protected and always created last
     local settingsTab = self:CreateTab("Settings")
     
+    if not settingsTab then
+        warn("Failed to create settings tab")
+        return
+    end
+    
     local keybindSection = settingsTab:CreateSection("Keybinds")
     local guiSection = settingsTab:CreateSection("GUI Settings")
+    
+    if not keybindSection or not guiSection then
+        warn("Failed to create settings sections")
+        return
+    end
     
     -- GUI Toggle Keybind
     keybindSection:CreateKeybind("GUI Toggle", self.keybinds.toggle, function(newKey)
@@ -1306,8 +1365,10 @@ function GuiLibrary:createSettingsTab()
     end)
     
     -- Watermark Toggle
-    guiSection:CreateToggle("Show Watermark", self.watermarkManager.isVisible, function(enabled)
-        self.watermarkManager:setVisible(enabled)
+    guiSection:CreateToggle("Show Watermark", self.watermarkManager and self.watermarkManager.isVisible or true, function(enabled)
+        if self.watermarkManager then
+            self.watermarkManager:setVisible(enabled)
+        end
         local status = enabled and "enabled" or "disabled"
         self:Notify("Watermark " .. (enabled and "Enabled" or "Disabled"), 
                    "Watermark display has been " .. status, 
@@ -1315,18 +1376,22 @@ function GuiLibrary:createSettingsTab()
     end)
     
     -- Config System
-    guiSection:CreateToggle("Auto Save", self.configManager.autoSaveEnabled, function(enabled)
-        self.configManager.autoSaveEnabled = enabled
-        if enabled then
-            self.configManager:startAutoSave()
-        else
-            self.configManager:stopAutoSave()
+    guiSection:CreateToggle("Auto Save", self.configManager and self.configManager.autoSaveEnabled or true, function(enabled)
+        if self.configManager then
+            self.configManager.autoSaveEnabled = enabled
+            if enabled then
+                self.configManager:startAutoSave()
+            else
+                self.configManager:stopAutoSave()
+            end
         end
         self:Notify("Auto Save", "Auto save " .. (enabled and "enabled" or "disabled"), "info")
     end)
     
-    guiSection:CreateSlider("Auto Save Interval", 10, 120, self.configManager.autoSaveInterval, function(value)
-        self.configManager.autoSaveInterval = value
+    guiSection:CreateSlider("Auto Save Interval", 10, 120, self.configManager and self.configManager.autoSaveInterval or 30, function(value)
+        if self.configManager then
+            self.configManager.autoSaveInterval = value
+        end
         self:Notify("Auto Save", "Interval set to " .. value .. " seconds", "info")
     end)
     
@@ -1396,24 +1461,38 @@ function GuiLibrary:createSettingsTab()
 end
 
 function GuiLibrary:createConfigButtons(section)
+    if not section then
+        warn("Invalid section for config buttons")
+        return
+    end
+    
     -- Config Dropdown
-    local configList = self.configManager:getConfigList()
+    local configList = {}
+    if self.configManager then
+        configList = self.configManager:getConfigList()
+    else
+        configList = {"Default"}
+    end
     
     local configDropdown = section:CreateDropdown("Current Config", configList, function(configName)
-        if configName ~= self.configManager.currentConfig then
+        if self.configManager and configName ~= self.configManager.currentConfig then
             self.configManager:loadConfig(configName)
         end
     end)
     
     -- Save Current Config Button
     self:createCustomButton(section, "Save Config", THEME.Success, function()
-        self.configManager:saveCurrentConfig()
+        if self.configManager then
+            self.configManager:saveCurrentConfig()
+        else
+            self:Notify("Config Error", "Config manager not available", "error")
+        end
     end)
     
     -- Create New Config Button
     self:createCustomButton(section, "New Config", THEME.Primary, function()
         self:showConfigNameInput("Create New Config", function(name)
-            if self.configManager:createConfig(name) then
+            if self.configManager and self.configManager:createConfig(name) then
                 -- Update dropdown with new config
                 local newConfigList = self.configManager:getConfigList()
                 self:updateDropdownOptions(configDropdown, newConfigList)
@@ -1424,19 +1503,26 @@ function GuiLibrary:createConfigButtons(section)
     
     -- Delete Config Button
     self:createCustomButton(section, "Delete Config", THEME.Error, function()
+        if not self.configManager then
+            self:Notify("Config Error", "Config manager not available", "error")
+            return
+        end
+        
         if self.configManager.currentConfig == "Default" then
             self:Notify("Config Error", "Cannot delete default config", "error")
             return
         end
         
         self:showConfirmDialog("Delete Config", 
-            "Are you sure you want to delete '" .. self.configManager.currentConfig .. "'?", 
+            "Are you sure you want to delete '" .. (self.configManager.currentConfig or "Unknown") .. "'?", 
             function()
-                local configToDelete = self.configManager.currentConfig
-                if self.configManager:deleteConfig(configToDelete) then
-                    -- Update dropdown
-                    local newConfigList = self.configManager:getConfigList()
-                    self:updateDropdownOptions(configDropdown, newConfigList)
+                if self.configManager then
+                    local configToDelete = self.configManager.currentConfig
+                    if self.configManager:deleteConfig(configToDelete) then
+                        -- Update dropdown
+                        local newConfigList = self.configManager:getConfigList()
+                        self:updateDropdownOptions(configDropdown, newConfigList)
+                    end
                 end
             end
         )
@@ -1444,17 +1530,24 @@ function GuiLibrary:createConfigButtons(section)
     
     -- Export Config Button
     self:createCustomButton(section, "Export Config", THEME.Warning, function()
+        if not self.configManager then
+            self:Notify("Config Error", "Config manager not available", "error")
+            return
+        end
+        
         local exportData = self.configManager:exportConfig()
         if exportData then
             -- Create export window
             self:showExportWindow(exportData)
+        else
+            self:Notify("Export Error", "Failed to export config", "error")
         end
     end)
     
     -- Import Config Button
     self:createCustomButton(section, "Import Config", THEME.Accent, function()
         self:showImportWindow(function(jsonData, configName)
-            if self.configManager:importConfig(jsonData, configName) then
+            if self.configManager and self.configManager:importConfig(jsonData, configName) then
                 -- Update dropdown
                 local newConfigList = self.configManager:getConfigList()
                 self:updateDropdownOptions(configDropdown, newConfigList)
@@ -2794,6 +2887,7 @@ function GuiLibrary:createSlider(parent, title, minValue, maxValue, default, yPo
             if clickArea then
                 clickArea.MouseButton1Down:Connect(function()
                     dragging = true
+                    updateSlider(UserInputService:GetMouseLocation().X)
                     
                     dragConnection = UserInputService.InputChanged:Connect(function(input)
                         if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
