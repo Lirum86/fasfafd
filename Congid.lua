@@ -162,20 +162,27 @@ end
 function ConfigManager:updateElementUI(element, value)
     if not element.container then return end
     
+    -- Get library reference safely
+    local library = self.library
+    if not library or not library.THEME then
+        warn("ConfigManager: Library or THEME not available for UI update")
+        return
+    end
+    
     if element.type == "toggle" then
-        self:updateToggleUI(element.container, value)
+        self:updateToggleUI(element.container, value, library)
     elseif element.type == "slider" then
-        self:updateSliderUI(element.container, value)
+        self:updateSliderUI(element.container, value, library)
     elseif element.type == "dropdown" then
-        self:updateDropdownUI(element.container, value)
+        self:updateDropdownUI(element.container, value, library)
     elseif element.type == "colorpicker" then
-        self:updateColorPickerUI(element.container, value)
+        self:updateColorPickerUI(element.container, value, library)
     elseif element.type == "keybind" then
-        self:updateKeybindUI(element.container, value)
+        self:updateKeybindUI(element.container, value, library)
     end
 end
 
-function ConfigManager:updateToggleUI(container, value)
+function ConfigManager:updateToggleUI(container, value, library)
     local toggleBG = container:FindFirstChild("Frame")
     if not toggleBG then return end
     
@@ -183,13 +190,21 @@ function ConfigManager:updateToggleUI(container, value)
     if not toggleButton then return end
     
     local newPos = value and UDim2.new(0, 27, 0, 2) or UDim2.new(0, 2, 0, 2)
-    local newColor = value and self.library.THEME.Primary or self.library.THEME.Border
+    
+    -- Safe theme access
+    local newColor
+    if library and library.THEME then
+        newColor = value and library.THEME.Primary or library.THEME.Border
+    else
+        -- Fallback colors if theme not available
+        newColor = value and Color3.fromRGB(80, 140, 255) or Color3.fromRGB(60, 60, 60)
+    end
     
     toggleButton.Position = newPos
     toggleBG.BackgroundColor3 = newColor
 end
 
-function ConfigManager:updateSliderUI(container, value)
+function ConfigManager:updateSliderUI(container, value, library)
     local valueLabel = nil
     local sliderFill = nil
     
@@ -213,7 +228,7 @@ function ConfigManager:updateSliderUI(container, value)
     -- This is a simplified version
 end
 
-function ConfigManager:updateDropdownUI(container, value)
+function ConfigManager:updateDropdownUI(container, value, library)
     local dropdownBtn = container:FindFirstChild("TextButton")
     if not dropdownBtn then return end
     
@@ -223,7 +238,7 @@ function ConfigManager:updateDropdownUI(container, value)
     end
 end
 
-function ConfigManager:updateColorPickerUI(container, value)
+function ConfigManager:updateColorPickerUI(container, value, library)
     local colorPreview = nil
     
     for _, child in pairs(container:GetChildren()) do
@@ -238,7 +253,7 @@ function ConfigManager:updateColorPickerUI(container, value)
     end
 end
 
-function ConfigManager:updateKeybindUI(container, value)
+function ConfigManager:updateKeybindUI(container, value, library)
     local keybindBtn = container:FindFirstChild("TextButton")
     if keybindBtn then
         keybindBtn.Text = tostring(value)
@@ -957,12 +972,19 @@ local function integrateConfigSystem(library)
                         value = Color3.fromRGB(value.r, value.g, value.b)
                     end
                     
-                    -- Update element value
+                    -- Update element value FIRST
                     element.value = value
                     element.state = value -- Backup storage
                     
-                    -- Update UI without triggering callback loops
-                    self.configManager:updateElementUI(element, value)
+                    -- Try to update UI safely (skip if it fails)
+                    local uiSuccess, uiError = pcall(function()
+                        self.configManager:updateElementUI(element, value)
+                    end)
+                    
+                    if not uiSuccess then
+                        warn("UI update failed for " .. elementPath .. ": " .. tostring(uiError))
+                        print("⚠️ Skipping UI update, but value is set")
+                    end
                     
                     -- Trigger original callback for functionality (like speed changes)
                     -- But NOT the enhanced callback to avoid save loops
@@ -970,6 +992,8 @@ local function integrateConfigSystem(library)
                         local success, err = pcall(element.originalCallback, value)
                         if not success then
                             warn("Error in original callback for " .. elementPath .. ": " .. tostring(err))
+                        else
+                            print("✅ Applied functionality for " .. elementPath)
                         end
                     end
                     
@@ -1006,7 +1030,9 @@ local function integrateConfigSystem(library)
             for key, value in pairs(savedData.config.keybinds) do
                 self.keybinds[key] = value
             end
-            self:setupKeybinds()
+            if self.setupKeybinds then
+                self:setupKeybinds()
+            end
             print("✅ Loaded keybinds")
         end
         
@@ -1023,7 +1049,9 @@ local function integrateConfigSystem(library)
         -- Success notification
         task.spawn(function()
             task.wait(1.5) -- Wait for GUI to fully load
-            self:Notify("Config Loaded", "Previous session restored successfully", "success", 4)
+            if self.Notify then
+                self:Notify("Config Loaded", "Previous session restored successfully", "success", 4)
+            end
         end)
         
         return true
