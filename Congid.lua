@@ -1,4 +1,3 @@
-
 --[[
     Lynix GUI Config System v1.0
     
@@ -585,51 +584,144 @@ function ConfigManager:destroy()
     end
 end
 
--- Persistent Storage System (Memory-based for Roblox)
+-- Persistent Storage System (Roblox File-based)
 local PersistentStorage = {}
 PersistentStorage.__index = PersistentStorage
 
 function PersistentStorage.new()
     local self = setmetatable({}, PersistentStorage)
-    self.data = {}
-    self.saveKey = "LynixGUI_AutoSave_" .. LocalPlayer.UserId
+    self.fileName = "LynixConfig_" .. LocalPlayer.UserId .. ".json"
+    self.folderName = "LynixConfigs"
     return self
 end
 
 function PersistentStorage:save(data)
-    -- In Roblox können wir nicht localStorage verwenden
-    -- Stattdessen speichern wir in einem globalen _G table
-    if not _G.LynixConfigs then
-        _G.LynixConfigs = {}
-    end
-    _G.LynixConfigs[self.saveKey] = data
+    local success = false
+    local jsonData = nil
     
-    -- Optional: Auch in DataStore speichern (falls verfügbar)
+    -- Convert data to JSON
     pcall(function()
-        local DataStoreService = game:GetService("DataStoreService")
-        local configStore = DataStoreService:GetDataStore("LynixConfigs")
-        configStore:SetAsync(LocalPlayer.UserId .. "_config", data)
+        jsonData = HttpService:JSONEncode(data)
     end)
+    
+    if not jsonData then
+        warn("PersistentStorage: Failed to encode data to JSON")
+        return false
+    end
+    
+    -- Method 1: Try writefile (Exploit/Executor support)
+    success = pcall(function()
+        if writefile then
+            if not isfolder(self.folderName) then
+                makefolder(self.folderName)
+            end
+            writefile(self.folderName .. "/" .. self.fileName, jsonData)
+            return true
+        end
+    end)
+    
+    if success then
+        print("✅ Config saved to file: " .. self.fileName)
+        return true
+    end
+    
+    -- Method 2: Fallback to _G (Session only)
+    pcall(function()
+        if not _G.LynixConfigs then
+            _G.LynixConfigs = {}
+        end
+        _G.LynixConfigs[LocalPlayer.UserId] = data
+        print("⚠️ Config saved to memory (session only)")
+        success = true
+    end)
+    
+    -- Method 3: Try DataStore (if in real game)
+    if not success then
+        pcall(function()
+            local DataStoreService = game:GetService("DataStoreService")
+            local configStore = DataStoreService:GetDataStore("LynixConfigs")
+            configStore:SetAsync(LocalPlayer.UserId .. "_config", data)
+            print("✅ Config saved to DataStore")
+            success = true
+        end)
+    end
+    
+    return success
 end
 
 function PersistentStorage:load()
-    -- Versuche aus _G zu laden
-    if _G.LynixConfigs and _G.LynixConfigs[self.saveKey] then
-        return _G.LynixConfigs[self.saveKey]
-    end
+    local data = nil
     
-    -- Fallback: Versuche aus DataStore zu laden
-    local success, data = pcall(function()
-        local DataStoreService = game:GetService("DataStoreService")
-        local configStore = DataStoreService:GetDataStore("LynixConfigs")
-        return configStore:GetAsync(LocalPlayer.UserId .. "_config")
+    -- Method 1: Try readfile (Executor support)
+    local fileSuccess = pcall(function()
+        if readfile and isfile(self.folderName .. "/" .. self.fileName) then
+            local fileContent = readfile(self.folderName .. "/" .. self.fileName)
+            if fileContent and fileContent ~= "" then
+                data = HttpService:JSONDecode(fileContent)
+                print("✅ Config loaded from file: " .. self.fileName)
+                return true
+            end
+        end
     end)
     
-    if success and data then
+    if fileSuccess and data then
         return data
     end
     
+    -- Method 2: Try _G (Session memory)
+    pcall(function()
+        if _G.LynixConfigs and _G.LynixConfigs[LocalPlayer.UserId] then
+            data = _G.LynixConfigs[LocalPlayer.UserId]
+            print("⚠️ Config loaded from memory (session)")
+        end
+    end)
+    
+    if data then
+        return data
+    end
+    
+    -- Method 3: Try DataStore
+    pcall(function()
+        local DataStoreService = game:GetService("DataStoreService")
+        local configStore = DataStoreService:GetDataStore("LynixConfigs")
+        data = configStore:GetAsync(LocalPlayer.UserId .. "_config")
+        if data then
+            print("✅ Config loaded from DataStore")
+        end
+    end)
+    
+    if data then
+        return data
+    end
+    
+    print("❌ No saved config found")
     return nil
+end
+
+function PersistentStorage:delete()
+    -- Delete from file
+    pcall(function()
+        if delfile and isfile(self.folderName .. "/" .. self.fileName) then
+            delfile(self.folderName .. "/" .. self.fileName)
+            print("🗑️ Config file deleted")
+        end
+    end)
+    
+    -- Delete from _G
+    pcall(function()
+        if _G.LynixConfigs and _G.LynixConfigs[LocalPlayer.UserId] then
+            _G.LynixConfigs[LocalPlayer.UserId] = nil
+            print("🗑️ Config cleared from memory")
+        end
+    end)
+    
+    -- Delete from DataStore
+    pcall(function()
+        local DataStoreService = game:GetService("DataStoreService")
+        local configStore = DataStoreService:GetDataStore("LynixConfigs")
+        configStore:RemoveAsync(LocalPlayer.UserId .. "_config")
+        print("🗑️ Config cleared from DataStore")
+    end)
 end
 
 -- Integration methods for GuiLibrary
@@ -639,8 +731,28 @@ local function integrateConfigSystem(library)
     library.persistentStorage = PersistentStorage.new()
     library.configElements = {}
     
-    -- Auto-Save aktivieren (sehr kurzes Intervall für "ständiges" Speichern)
-    library.configManager:setAutoSave(true, 3) -- Alle 3 Sekunden
+    -- Check storage capabilities on startup
+    library.storageInfo = {
+        fileSupport = (writefile and readfile and isfolder and makefolder) ~= nil,
+        dataStoreSupport = false,
+        memoryOnly = false
+    }
+    
+    -- Test DataStore support
+    pcall(function()
+        local DataStoreService = game:GetService("DataStoreService")
+        local testStore = DataStoreService:GetDataStore("TestStore")
+        library.storageInfo.dataStoreSupport = true
+    end)
+    
+    -- Determine storage method
+    if not library.storageInfo.fileSupport and not library.storageInfo.dataStoreSupport then
+        library.storageInfo.memoryOnly = true
+        warn("ConfigSystem: No persistent storage available - configs will only last during session")
+    end
+    
+    -- Auto-Save aktivieren mit angepasstem Intervall
+    library.configManager:setAutoSave(true, 5) -- 5 Sekunden
     
     -- Override createElement to auto-register elements
     local originalCreateElement = library.createElement
@@ -656,17 +768,20 @@ local function integrateConfigSystem(library)
             -- Register element with config system
             self.configManager:registerElement(elementPath, element)
             
-            -- Sofort speichern bei Änderung
+            -- Enhanced callback with immediate save
             local originalCallback = element.callback
             element.callback = function(value)
-                -- Original callback ausführen
+                -- Update element value first
+                element.value = value
+                
+                -- Execute original callback
                 if originalCallback then
                     pcall(originalCallback, value)
                 end
                 
-                -- Sofort speichern
+                -- Immediate save after change
                 task.spawn(function()
-                    task.wait(0.1) -- Kurz warten für UI-Update
+                    task.wait(0.2) -- Small delay for UI updates
                     self:autoSaveToPersistent()
                 end)
             end
@@ -675,86 +790,178 @@ local function integrateConfigSystem(library)
         return element
     end
     
-    -- Auto-Save zu persistentem Speicher
+    -- Enhanced auto-save to persistent storage
     function library:autoSaveToPersistent()
-        if not self.configManager then return end
+        if not self.configManager then return false end
         
-        self.configManager:saveCurrentState()
-        local configData = self.configManager.configs[self.configManager.currentConfig]
-        
-        if configData then
-            -- Zusätzliche Metadaten für Auto-Load
-            local saveData = {
-                config = configData,
-                timestamp = tick(),
-                autoSave = true,
-                version = "1.0.0"
-            }
-            
-            self.persistentStorage:save(saveData)
+        -- Force save current state
+        local success = self.configManager:saveCurrentState()
+        if not success then
+            warn("ConfigSystem: Failed to save current state")
+            return false
         end
+        
+        local configData = self.configManager.configs[self.configManager.currentConfig]
+        if not configData then
+            warn("ConfigSystem: No config data to save")
+            return false
+        end
+        
+        -- Create save package with metadata
+        local savePackage = {
+            config = configData,
+            metadata = {
+                timestamp = tick(),
+                version = "1.0.0",
+                userId = LocalPlayer.UserId,
+                userName = LocalPlayer.Name,
+                autoSave = true,
+                storageMethod = self.storageInfo.fileSupport and "file" or 
+                               self.storageInfo.dataStoreSupport and "datastore" or "memory"
+            }
+        }
+        
+        -- Save to persistent storage
+        local saveSuccess = self.persistentStorage:save(savePackage)
+        if saveSuccess then
+            print("💾 Auto-saved config at " .. os.date("%H:%M:%S"))
+        else
+            warn("ConfigSystem: Failed to save config to persistent storage")
+        end
+        
+        return saveSuccess
     end
     
-    -- Auto-Load von persistentem Speicher
+    -- Enhanced auto-load from persistent storage
     function library:autoLoadFromPersistent()
+        print("🔄 Attempting to load saved config...")
+        
         local savedData = self.persistentStorage:load()
         
-        if savedData and savedData.config and savedData.autoSave then
-            -- Validiere die geladenen Daten
-            if self.configManager:validateConfig(savedData.config) then
-                -- Lade die Config
-                self.configManager.configs["AutoSaved"] = savedData.config
-                self.configManager:loadConfig("AutoSaved")
-                
-                -- Benachrichtigung (optional)
-                task.spawn(function()
-                    task.wait(1) -- Warten bis GUI vollständig geladen
-                    self:Notify("Auto-Load", "Previous session restored", "success", 3)
-                end)
-                
-                return true
-            else
-                warn("ConfigManager: Invalid auto-saved config, using defaults")
+        if not savedData then
+            print("📝 No saved config found - using defaults")
+            return false
+        end
+        
+        if not savedData.config then
+            warn("ConfigSystem: Invalid saved data format")
+            return false
+        end
+        
+        -- Validate config structure
+        if not self.configManager:validateConfig(savedData.config) then
+            warn("ConfigSystem: Saved config failed validation - using defaults")
+            return false
+        end
+        
+        -- Show load info
+        if savedData.metadata then
+            local saveTime = savedData.metadata.timestamp
+            local timeAgo = saveTime and math.floor(tick() - saveTime) or "unknown"
+            print("📂 Loading config saved " .. timeAgo .. " seconds ago")
+            print("💾 Storage method: " .. (savedData.metadata.storageMethod or "unknown"))
+        end
+        
+        -- Load the config
+        self.configManager.configs["AutoLoaded"] = savedData.config
+        self.configManager.currentConfig = "AutoLoaded"
+        
+        -- Apply to all registered elements
+        if savedData.config.elements and self.configElements then
+            local loadedCount = 0
+            
+            for elementPath, element in pairs(self.configElements) do
+                if savedData.config.elements[elementPath] then
+                    local savedElement = savedData.config.elements[elementPath]
+                    local value = savedElement.value
+                    
+                    -- Convert RGB table back to Color3
+                    if savedElement.type == "colorpicker" and type(value) == "table" and value.r then
+                        value = Color3.fromRGB(value.r, value.g, value.b)
+                    end
+                    
+                    -- Update element value
+                    element.value = value
+                    
+                    -- Update UI without triggering callback loops
+                    self.configManager:updateElementUI(element, value)
+                    
+                    -- Trigger callback for functionality (like speed changes)
+                    if element.callback then
+                        pcall(element.callback, value)
+                    end
+                    
+                    loadedCount = loadedCount + 1
+                end
+            end
+            
+            print("✅ Loaded " .. loadedCount .. " config values")
+        end
+        
+        -- Load GUI state
+        if savedData.config.gui then
+            local guiConfig = savedData.config.gui
+            
+            if guiConfig.position and self.mainFrame then
+                local pos = guiConfig.position
+                self.mainFrame.Position = UDim2.new(pos[1], pos[2], pos[3], pos[4])
+            end
+            
+            if guiConfig.minimized then
+                self:hide()
             end
         end
         
-        return false
+        -- Load keybinds
+        if savedData.config.keybinds then
+            for key, value in pairs(savedData.config.keybinds) do
+                self.keybinds[key] = value
+            end
+            self:setupKeybinds()
+        end
+        
+        -- Load watermark state
+        if savedData.config.watermark and self.watermarkManager then
+            self.watermarkManager:setVisible(savedData.config.watermark.visible)
+            if savedData.config.watermark.position and self.watermarkManager.container then
+                local pos = savedData.config.watermark.position
+                self.watermarkManager.container.Position = UDim2.new(pos[1], pos[2], pos[3], pos[4])
+            end
+        end
+        
+        -- Success notification
+        task.spawn(function()
+            task.wait(1.5) -- Wait for GUI to fully load
+            self:Notify("Config Loaded", "Previous session restored successfully", "success", 4)
+        end)
+        
+        return true
     end
     
-    -- Auto-Load beim Start (nach GUI-Erstellung)
+    -- Delayed auto-load (after all elements are created)
     task.spawn(function()
-        task.wait(0.5) -- Warten bis alle Elemente erstellt sind
+        task.wait(1) -- Wait for all GUI elements to be created
         library:autoLoadFromPersistent()
         
-        -- Dann kontinuierliches Auto-Save starten
-        while library and library.configManager do
-            task.wait(5) -- Alle 5 Sekunden checken
-            if library.configManager and library.configManager.autoSaveEnabled then
+        -- Start continuous auto-save loop
+        while library and library.configManager and library.configManager.autoSaveEnabled do
+            task.wait(library.configManager.autoSaveInterval or 5)
+            if library.configManager.autoSaveEnabled then
                 library:autoSaveToPersistent()
             end
         end
     end)
     
-    -- Override destroy to cleanup and final save
-    local originalDestroy = library.destroy
-    function library:destroy()
-        -- Finale Speicherung vor dem Zerstören
-        if self.configManager then
-            self:autoSaveToPersistent()
-            self.configManager:destroy()
-        end
-        originalDestroy(self)
-    end
-    
-    -- Zusätzliche Methoden (falls du sie trotzdem brauchst)
+    -- Enhanced config methods
     function library:SaveConfig(configName)
-        if configName then
-            self.configManager:createConfig(configName)
+        configName = configName or "Manual_" .. os.date("%H_%M_%S")
+        
+        if self.configManager:createConfig(configName) then
             self.configManager:loadConfig(configName)
-        else
-            self.configManager:saveCurrentState()
+            self:autoSaveToPersistent()
+            return true
         end
-        self:autoSaveToPersistent()
+        return false
     end
     
     function library:LoadConfig(configName)
@@ -765,7 +972,12 @@ local function integrateConfigSystem(library)
         return success
     end
     
+    function library:DeleteConfig(configName)
+        return self.configManager:deleteConfig(configName)
+    end
+    
     function library:ExportConfig(configName)
+        configName = configName or self.configManager.currentConfig
         return self.configManager:exportConfig(configName)
     end
     
@@ -782,7 +994,38 @@ local function integrateConfigSystem(library)
     end
     
     function library:SetAutoSave(enabled, interval)
-        self.configManager:setAutoSave(enabled, interval or 3)
+        self.configManager:setAutoSave(enabled, interval)
+    end
+    
+    function library:DeleteSavedConfig()
+        self.persistentStorage:delete()
+        self:Notify("Config Deleted", "Saved configuration has been deleted", "info")
+    end
+    
+    function library:GetStorageInfo()
+        return {
+            fileSupport = self.storageInfo.fileSupport,
+            dataStoreSupport = self.storageInfo.dataStoreSupport,
+            memoryOnly = self.storageInfo.memoryOnly,
+            currentMethod = self.storageInfo.fileSupport and "File System" or
+                           self.storageInfo.dataStoreSupport and "DataStore" or "Memory Only"
+        }
+    end
+    
+    -- Override destroy to cleanup and final save
+    local originalDestroy = library.destroy
+    function library:destroy()
+        -- Final save before cleanup
+        if self.configManager then
+            print("💾 Performing final config save...")
+            self:autoSaveToPersistent()
+            self.configManager:destroy()
+        end
+        
+        -- Original cleanup
+        originalDestroy(self)
+        
+        print("🧹 Config system cleaned up")
     end
 end
 
