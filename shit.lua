@@ -1540,6 +1540,17 @@ function GuiLibrary:createCustomButton(section, text, color, callback)
 end
 
 function GuiLibrary:showConfigNameInput(title, callback)
+    -- Create backdrop first
+    local backdrop = safeCreate("Frame", {
+        Size = UDim2.new(1, 0, 1, 0),
+        Position = UDim2.new(0, 0, 0, 0),
+        BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+        BackgroundTransparency = 0.5,
+        BorderSizePixel = 0,
+        ZIndex = 19,
+        Parent = self.screenGui
+    })
+    
     local inputDialog = safeCreate("Frame", {
         Size = UDim2.new(0, 400, 0, 200),
         Position = UDim2.new(0.5, -200, 0.5, -100),
@@ -1572,6 +1583,7 @@ function GuiLibrary:showConfigNameInput(title, callback)
             TextSize = 16,
             Font = Enum.Font.GothamBold,
             TextXAlignment = Enum.TextXAlignment.Center,
+            ZIndex = 21,
             Parent = inputDialog
         })
         
@@ -1587,6 +1599,7 @@ function GuiLibrary:showConfigNameInput(title, callback)
             PlaceholderColor3 = THEME.TextSecondary,
             TextSize = 14,
             Font = Enum.Font.Gotham,
+            ZIndex = 21,
             Parent = inputDialog
         })
         
@@ -1614,6 +1627,7 @@ function GuiLibrary:showConfigNameInput(title, callback)
             TextColor3 = Color3.fromRGB(255, 255, 255),
             TextSize = 14,
             Font = Enum.Font.GothamBold,
+            ZIndex = 21,
             Parent = inputDialog
         })
         
@@ -1626,6 +1640,7 @@ function GuiLibrary:showConfigNameInput(title, callback)
             TextColor3 = Color3.fromRGB(255, 255, 255),
             TextSize = 14,
             Font = Enum.Font.GothamBold,
+            ZIndex = 21,
             Parent = inputDialog
         })
         
@@ -1643,13 +1658,18 @@ function GuiLibrary:showConfigNameInput(title, callback)
             })
         end
         
+        local function closeDialog()
+            if backdrop then backdrop:Destroy() end
+            if inputDialog then inputDialog:Destroy() end
+        end
+        
         -- Button events
         if createBtn and inputBox then
             createBtn.MouseButton1Click:Connect(function()
                 local configName = inputBox.Text
                 if configName and configName ~= "" then
                     callback(configName)
-                    inputDialog:Destroy()
+                    closeDialog()
                 else
                     self:Notify("Config Error", "Please enter a valid name", "error")
                 end
@@ -1658,7 +1678,14 @@ function GuiLibrary:showConfigNameInput(title, callback)
         
         if cancelBtn then
             cancelBtn.MouseButton1Click:Connect(function()
-                inputDialog:Destroy()
+                closeDialog()
+            end)
+        end
+        
+        -- Click backdrop to close
+        if backdrop then
+            backdrop.MouseButton1Click:Connect(function()
+                closeDialog()
             end)
         end
         
@@ -1671,6 +1698,17 @@ function GuiLibrary:showConfigNameInput(title, callback)
 end
 
 function GuiLibrary:showConfirmDialog(title, message, callback)
+    -- Create backdrop
+    local backdrop = safeCreate("Frame", {
+        Size = UDim2.new(1, 0, 1, 0),
+        Position = UDim2.new(0, 0, 0, 0),
+        BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+        BackgroundTransparency = 0.5,
+        BorderSizePixel = 0,
+        ZIndex = 19,
+        Parent = self.screenGui
+    })
+    
     local confirmDialog = safeCreate("Frame", {
         Size = UDim2.new(0, 400, 0, 180),
         Position = UDim2.new(0.5, -200, 0.5, -90),
@@ -1703,6 +1741,7 @@ function GuiLibrary:showConfirmDialog(title, message, callback)
             TextSize = 16,
             Font = Enum.Font.GothamBold,
             TextXAlignment = Enum.TextXAlignment.Center,
+            ZIndex = 21,
             Parent = confirmDialog
         })
         
@@ -1718,6 +1757,7 @@ function GuiLibrary:showConfirmDialog(title, message, callback)
             TextXAlignment = Enum.TextXAlignment.Center,
             TextYAlignment = Enum.TextYAlignment.Center,
             TextWrapped = true,
+            ZIndex = 21,
             Parent = confirmDialog
         })
         
@@ -1731,6 +1771,7 @@ function GuiLibrary:showConfirmDialog(title, message, callback)
             TextColor3 = Color3.fromRGB(255, 255, 255),
             TextSize = 14,
             Font = Enum.Font.GothamBold,
+            ZIndex = 21,
             Parent = confirmDialog
         })
         
@@ -1743,6 +1784,7 @@ function GuiLibrary:showConfirmDialog(title, message, callback)
             TextColor3 = Color3.fromRGB(255, 255, 255),
             TextSize = 14,
             Font = Enum.Font.GothamBold,
+            ZIndex = 21,
             Parent = confirmDialog
         })
         
@@ -1751,11 +1793,6 @@ function GuiLibrary:showConfirmDialog(title, message, callback)
                 CornerRadius = UDim.new(0, 8),
                 Parent = confirmBtn
             })
-            
-            confirmBtn.MouseButton1Click:Connect(function()
-                callback()
-                confirmDialog:Destroy()
-            end)
         end
         
         if cancelBtn then
@@ -1763,9 +1800,30 @@ function GuiLibrary:showConfirmDialog(title, message, callback)
                 CornerRadius = UDim.new(0, 8),
                 Parent = cancelBtn
             })
-            
+        end
+        
+        local function closeDialog()
+            if backdrop then backdrop:Destroy() end
+            if confirmDialog then confirmDialog:Destroy() end
+        end
+        
+        if confirmBtn then
+            confirmBtn.MouseButton1Click:Connect(function()
+                callback()
+                closeDialog()
+            end)
+        end
+        
+        if cancelBtn then
             cancelBtn.MouseButton1Click:Connect(function()
-                confirmDialog:Destroy()
+                closeDialog()
+            end)
+        end
+        
+        -- Click backdrop to close
+        if backdrop then
+            backdrop.MouseButton1Click:Connect(function()
+                closeDialog()
             end)
         end
         
@@ -1778,6 +1836,17 @@ function GuiLibrary:showConfirmDialog(title, message, callback)
 end
 
 function GuiLibrary:showExportWindow(exportData)
+    -- Create backdrop
+    local backdrop = safeCreate("Frame", {
+        Size = UDim2.new(1, 0, 1, 0),
+        Position = UDim2.new(0, 0, 0, 0),
+        BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+        BackgroundTransparency = 0.5,
+        BorderSizePixel = 0,
+        ZIndex = 19,
+        Parent = self.screenGui
+    })
+    
     local exportDialog = safeCreate("Frame", {
         Size = UDim2.new(0, 500, 0, 400),
         Position = UDim2.new(0.5, -250, 0.5, -200),
@@ -1810,6 +1879,7 @@ function GuiLibrary:showExportWindow(exportData)
             TextSize = 16,
             Font = Enum.Font.GothamBold,
             TextXAlignment = Enum.TextXAlignment.Center,
+            ZIndex = 21,
             Parent = exportDialog
         })
         
@@ -1828,6 +1898,7 @@ function GuiLibrary:showExportWindow(exportData)
             TextWrapped = true,
             MultiLine = true,
             ClearTextOnFocus = false,
+            ZIndex = 21,
             Parent = exportDialog
         })
         
@@ -1847,7 +1918,7 @@ function GuiLibrary:showExportWindow(exportData)
         
         -- Copy button
         local copyBtn = safeCreate("TextButton", {
-            Size = UDim2.new(0, 120, 0, 35),
+            Size = UDim2.new(0, 140, 0, 35),
             Position = UDim2.new(0, 60, 1, -50),
             BackgroundColor3 = THEME.Success,
             BorderSizePixel = 0,
@@ -1855,6 +1926,7 @@ function GuiLibrary:showExportWindow(exportData)
             TextColor3 = Color3.fromRGB(255, 255, 255),
             TextSize = 14,
             Font = Enum.Font.GothamBold,
+            ZIndex = 21,
             Parent = exportDialog
         })
         
@@ -1867,6 +1939,7 @@ function GuiLibrary:showExportWindow(exportData)
             TextColor3 = Color3.fromRGB(255, 255, 255),
             TextSize = 14,
             Font = Enum.Font.GothamBold,
+            ZIndex = 21,
             Parent = exportDialog
         })
         
@@ -1875,7 +1948,21 @@ function GuiLibrary:showExportWindow(exportData)
                 CornerRadius = UDim.new(0, 8),
                 Parent = copyBtn
             })
-            
+        end
+        
+        if closeBtn then
+            local closeCorner = safeCreate("UICorner", {
+                CornerRadius = UDim.new(0, 8),
+                Parent = closeBtn
+            })
+        end
+        
+        local function closeDialog()
+            if backdrop then backdrop:Destroy() end
+            if exportDialog then exportDialog:Destroy() end
+        end
+        
+        if copyBtn then
             copyBtn.MouseButton1Click:Connect(function()
                 -- Try to copy to clipboard
                 pcall(function()
@@ -1886,7 +1973,25 @@ function GuiLibrary:showExportWindow(exportData)
         end
         
         if closeBtn then
-            local closeCorner = safeCreate("UICorner", {
+            closeBtn.MouseButton1Click:Connect(function()
+                closeDialog()
+            end)
+        end
+        
+        -- Click backdrop to close
+        if backdrop then
+            backdrop.MouseButton1Click:Connect(function()
+                closeDialog()
+            end)
+        end
+        
+        -- Entrance animation
+        exportDialog.Size = UDim2.new(0, 0, 0, 0)
+        TweenService:Create(exportDialog, ANIMATIONS.Bounce, {
+            Size = UDim2.new(0, 500, 0, 400)
+        }):Play()
+    end
+end
                 CornerRadius = UDim.new(0, 8),
                 Parent = closeBtn
             })
@@ -1905,6 +2010,17 @@ function GuiLibrary:showExportWindow(exportData)
 end
 
 function GuiLibrary:showImportWindow(callback)
+    -- Create backdrop
+    local backdrop = safeCreate("Frame", {
+        Size = UDim2.new(1, 0, 1, 0),
+        Position = UDim2.new(0, 0, 0, 0),
+        BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+        BackgroundTransparency = 0.5,
+        BorderSizePixel = 0,
+        ZIndex = 19,
+        Parent = self.screenGui
+    })
+    
     local importDialog = safeCreate("Frame", {
         Size = UDim2.new(0, 500, 0, 400),
         Position = UDim2.new(0.5, -250, 0.5, -200),
@@ -1937,6 +2053,7 @@ function GuiLibrary:showImportWindow(callback)
             TextSize = 16,
             Font = Enum.Font.GothamBold,
             TextXAlignment = Enum.TextXAlignment.Center,
+            ZIndex = 21,
             Parent = importDialog
         })
         
@@ -1957,6 +2074,7 @@ function GuiLibrary:showImportWindow(callback)
             TextWrapped = true,
             MultiLine = true,
             ClearTextOnFocus = false,
+            ZIndex = 21,
             Parent = importDialog
         })
         
@@ -1986,6 +2104,7 @@ function GuiLibrary:showImportWindow(callback)
             PlaceholderColor3 = THEME.TextSecondary,
             TextSize = 14,
             Font = Enum.Font.Gotham,
+            ZIndex = 21,
             Parent = importDialog
         })
         
@@ -2013,6 +2132,7 @@ function GuiLibrary:showImportWindow(callback)
             TextColor3 = Color3.fromRGB(255, 255, 255),
             TextSize = 14,
             Font = Enum.Font.GothamBold,
+            ZIndex = 21,
             Parent = importDialog
         })
         
@@ -2025,6 +2145,7 @@ function GuiLibrary:showImportWindow(callback)
             TextColor3 = Color3.fromRGB(255, 255, 255),
             TextSize = 14,
             Font = Enum.Font.GothamBold,
+            ZIndex = 21,
             Parent = importDialog
         })
         
@@ -2033,18 +2154,6 @@ function GuiLibrary:showImportWindow(callback)
                 CornerRadius = UDim.new(0, 8),
                 Parent = importBtn
             })
-            
-            importBtn.MouseButton1Click:Connect(function()
-                local jsonData = importBox.Text
-                local configName = nameBox.Text
-                
-                if jsonData and jsonData ~= "" then
-                    callback(jsonData, configName ~= "" and configName or nil)
-                    importDialog:Destroy()
-                else
-                    self:Notify("Import Error", "Please paste valid JSON data", "error")
-                end
-            end)
         end
         
         if cancelBtn then
@@ -2052,9 +2161,37 @@ function GuiLibrary:showImportWindow(callback)
                 CornerRadius = UDim.new(0, 8),
                 Parent = cancelBtn
             })
-            
+        end
+        
+        local function closeDialog()
+            if backdrop then backdrop:Destroy() end
+            if importDialog then importDialog:Destroy() end
+        end
+        
+        if importBtn then
+            importBtn.MouseButton1Click:Connect(function()
+                local jsonData = importBox.Text
+                local configName = nameBox.Text
+                
+                if jsonData and jsonData ~= "" then
+                    callback(jsonData, configName ~= "" and configName or nil)
+                    closeDialog()
+                else
+                    self:Notify("Import Error", "Please paste valid JSON data", "error")
+                end
+            end)
+        end
+        
+        if cancelBtn then
             cancelBtn.MouseButton1Click:Connect(function()
-                importDialog:Destroy()
+                closeDialog()
+            end)
+        end
+        
+        -- Click backdrop to close
+        if backdrop then
+            backdrop.MouseButton1Click:Connect(function()
+                closeDialog()
             end)
         end
         
