@@ -95,13 +95,32 @@ function ConfigManager:registerElement(elementPath, element)
 end
 
 function ConfigManager:saveElementState(elementPath, element)
-    if not element or not element.value then return end
+    if not element then 
+        warn("ConfigManager: Element is nil for path " .. tostring(elementPath))
+        return 
+    end
     
     local config = self.configs[self.currentConfig]
-    if not config then return end
+    if not config then 
+        warn("ConfigManager: No current config found")
+        return 
+    end
+    
+    -- Get value from element (check multiple possible locations)
+    local value = element.value
+    if value == nil and element.state then
+        value = element.state
+    end
+    if value == nil and element.current then
+        value = element.current
+    end
+    
+    if value == nil then
+        warn("ConfigManager: No value found for element " .. elementPath)
+        return
+    end
     
     -- Convert Color3 to RGB table for JSON compatibility
-    local value = element.value
     if typeof(value) == "Color3" then
         value = {
             r = math.floor(value.R * 255),
@@ -115,6 +134,8 @@ function ConfigManager:saveElementState(elementPath, element)
         value = value,
         timestamp = tick()
     }
+    
+    print("💾 Saved element: " .. elementPath .. " = " .. tostring(value))
 end
 
 function ConfigManager:loadElementState(elementPath, element)
@@ -225,10 +246,18 @@ function ConfigManager:updateKeybindUI(container, value)
 end
 
 function ConfigManager:saveCurrentState()
-    if not self.library then return false end
+    if not self.library then 
+        warn("ConfigManager: Library not found")
+        return false 
+    end
     
     local config = self.configs[self.currentConfig]
-    if not config then return false end
+    if not config then 
+        warn("ConfigManager: Current config not found")
+        return false 
+    end
+    
+    print("💾 Saving current state for config: " .. self.currentConfig)
     
     -- Save GUI state
     if self.library.mainFrame then
@@ -236,6 +265,7 @@ function ConfigManager:saveCurrentState()
         config.gui.position = {pos.X.Scale, pos.X.Offset, pos.Y.Scale, pos.Y.Offset}
         config.gui.visible = self.library.isVisible
         config.gui.minimized = self.library.isMinimized
+        print("💾 Saved GUI state")
     end
     
     -- Save keybinds
@@ -244,6 +274,7 @@ function ConfigManager:saveCurrentState()
         for key, value in pairs(self.library.keybinds) do
             config.keybinds[key] = value
         end
+        print("💾 Saved keybinds")
     end
     
     -- Save watermark state
@@ -253,21 +284,35 @@ function ConfigManager:saveCurrentState()
             local pos = self.library.watermarkManager.container.Position
             config.watermark.position = {pos.X.Scale, pos.X.Offset, pos.Y.Scale, pos.Y.Offset}
         end
+        print("💾 Saved watermark state")
     end
     
-    -- Save all registered elements
+    -- Save all registered elements with detailed logging
+    local elementsSaved = 0
     if self.library.configElements then
+        print("💾 Found " .. #self.library.configElements .. " registered elements")
+        
         for path, element in pairs(self.library.configElements) do
-            self:saveElementState(path, element)
+            if element then
+                print("💾 Processing element: " .. path .. " (type: " .. (element.type or "unknown") .. ")")
+                self:saveElementState(path, element)
+                elementsSaved = elementsSaved + 1
+            else
+                warn("ConfigManager: Element is nil for path " .. path)
+            end
         end
+    else
+        warn("ConfigManager: No configElements table found")
     end
     
     config.timestamp = tick()
     
+    print("💾 Saved " .. elementsSaved .. " elements total")
+    
     -- Add to history for backup
     self:addToHistory(config)
     
-    return true
+    return elementsSaved > 0 -- Return true only if we actually saved some elements
 end
 
 function ConfigManager:loadConfig(configName)
@@ -765,26 +810,48 @@ local function integrateConfigSystem(library)
             local sectionName = section.name
             local elementPath = tabName .. "." .. sectionName .. "." .. name
             
+            print("🔧 Registering element: " .. elementPath .. " (type: " .. elementType .. ")")
+            
+            -- Ensure configElements table exists
+            if not self.configElements then
+                self.configElements = {}
+            end
+            
             -- Register element with config system
+            element.configPath = elementPath -- Store path in element for debugging
+            self.configElements[elementPath] = element
             self.configManager:registerElement(elementPath, element)
             
-            -- Enhanced callback with immediate save
-            local originalCallback = element.callback
+            -- Enhanced callback with immediate save and value tracking
+            local originalCallback = callback
+            element.originalCallback = originalCallback
+            
             element.callback = function(value)
-                -- Update element value first
+                print("🔄 Element changed: " .. elementPath .. " = " .. tostring(value))
+                
+                -- Update element value FIRST
                 element.value = value
+                element.state = value -- Backup storage
                 
                 -- Execute original callback
                 if originalCallback then
-                    pcall(originalCallback, value)
+                    local success, err = pcall(originalCallback, value)
+                    if not success then
+                        warn("Callback error for " .. elementPath .. ": " .. tostring(err))
+                    end
                 end
                 
                 -- Immediate save after change
                 task.spawn(function()
-                    task.wait(0.2) -- Small delay for UI updates
+                    task.wait(0.1) -- Small delay for UI updates
+                    print("💾 Triggering auto-save for " .. elementPath)
                     self:autoSaveToPersistent()
                 end)
             end
+            
+            print("✅ Successfully registered: " .. elementPath)
+        else
+            warn("Failed to create element: " .. name)
         end
         
         return element
@@ -862,18 +929,28 @@ local function integrateConfigSystem(library)
             print("💾 Storage method: " .. (savedData.metadata.storageMethod or "unknown"))
         end
         
-        -- Load the config
+        -- Load the config into ConfigManager
         self.configManager.configs["AutoLoaded"] = savedData.config
         self.configManager.currentConfig = "AutoLoaded"
         
-        -- Apply to all registered elements
+        -- Apply to all registered elements with detailed logging
         if savedData.config.elements and self.configElements then
             local loadedCount = 0
+            local totalElements = 0
+            
+            -- Count total elements
+            for _ in pairs(self.configElements) do
+                totalElements = totalElements + 1
+            end
+            
+            print("🔄 Attempting to load " .. totalElements .. " elements...")
             
             for elementPath, element in pairs(self.configElements) do
                 if savedData.config.elements[elementPath] then
                     local savedElement = savedData.config.elements[elementPath]
                     local value = savedElement.value
+                    
+                    print("🔄 Loading " .. elementPath .. " = " .. tostring(value))
                     
                     -- Convert RGB table back to Color3
                     if savedElement.type == "colorpicker" and type(value) == "table" and value.r then
@@ -882,20 +959,30 @@ local function integrateConfigSystem(library)
                     
                     -- Update element value
                     element.value = value
+                    element.state = value -- Backup storage
                     
                     -- Update UI without triggering callback loops
                     self.configManager:updateElementUI(element, value)
                     
-                    -- Trigger callback for functionality (like speed changes)
-                    if element.callback then
-                        pcall(element.callback, value)
+                    -- Trigger original callback for functionality (like speed changes)
+                    -- But NOT the enhanced callback to avoid save loops
+                    if element.originalCallback then
+                        local success, err = pcall(element.originalCallback, value)
+                        if not success then
+                            warn("Error in original callback for " .. elementPath .. ": " .. tostring(err))
+                        end
                     end
                     
                     loadedCount = loadedCount + 1
+                    print("✅ Loaded " .. elementPath .. " successfully")
+                else
+                    print("⚠️ No saved value for " .. elementPath)
                 end
             end
             
-            print("✅ Loaded " .. loadedCount .. " config values")
+            print("✅ Loaded " .. loadedCount .. "/" .. totalElements .. " config values")
+        else
+            warn("ConfigSystem: No elements to load or no saved elements")
         end
         
         -- Load GUI state
@@ -905,10 +992,12 @@ local function integrateConfigSystem(library)
             if guiConfig.position and self.mainFrame then
                 local pos = guiConfig.position
                 self.mainFrame.Position = UDim2.new(pos[1], pos[2], pos[3], pos[4])
+                print("✅ Loaded GUI position")
             end
             
             if guiConfig.minimized then
                 self:hide()
+                print("✅ Loaded GUI minimized state")
             end
         end
         
@@ -918,6 +1007,7 @@ local function integrateConfigSystem(library)
                 self.keybinds[key] = value
             end
             self:setupKeybinds()
+            print("✅ Loaded keybinds")
         end
         
         -- Load watermark state
@@ -927,6 +1017,7 @@ local function integrateConfigSystem(library)
                 local pos = savedData.config.watermark.position
                 self.watermarkManager.container.Position = UDim2.new(pos[1], pos[2], pos[3], pos[4])
             end
+            print("✅ Loaded watermark state")
         end
         
         -- Success notification
