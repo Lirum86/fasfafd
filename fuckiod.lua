@@ -757,9 +757,12 @@ function GuiLibrary.new(title)
     self.keybinds = {
         toggle = "RightShift"
     }
-    self.notificationManager = NotificationManager.new()
-    self.watermarkManager = WatermarkManager.new(self)
-    self.connections = {}
+self.notificationManager = NotificationManager.new()
+self.watermarkManager = WatermarkManager.new(self)
+self.connections = {}
+self.Options = {}  -- NEUE ZEILE FÜR SAVEMANAGER
+
+self:createGUI()
     
     self:createGUI()
     self:setupKeybinds()
@@ -1409,12 +1412,17 @@ function GuiLibrary:createElement(section, elementType, name, data, callback)
         end)
     end
     
-    table.insert(section.elements, element)
-    
-    -- Update canvas size
-    if section.container then
-        section.container.CanvasSize = UDim2.new(0, 0, 0, #section.elements * 80 + 20)
-    end
+table.insert(section.elements, element)
+
+-- Register element for SaveManager
+if self.Options then
+    self.Options[name] = element
+end
+
+-- Update canvas size
+if section.container then
+    section.container.CanvasSize = UDim2.new(0, 0, 0, #section.elements * 80 + 20)
+end
     
     return element
 end
