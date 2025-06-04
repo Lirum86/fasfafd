@@ -982,7 +982,7 @@ function GuiLibrary:createSettingsTab()
     local settingsTab = self:CreateTab("Settings")
     
     local keybindSection = settingsTab:CreateSection("Keybinds")
-    local guiSection = settingsTab:CreateSection("GUI Settings")
+    local configSection = settingsTab:CreateSection("Configuration")
     
     -- GUI Toggle Keybind
     keybindSection:CreateKeybind("GUI Toggle", self.keybinds.toggle, function(newKey)
@@ -992,13 +992,125 @@ function GuiLibrary:createSettingsTab()
     end)
     
     -- Watermark Toggle
-    guiSection:CreateToggle("Show Watermark", self.watermarkManager.isVisible, function(enabled)
+    keybindSection:CreateToggle("Show Watermark", self.watermarkManager.isVisible, function(enabled)
         self.watermarkManager:setVisible(enabled)
         local status = enabled and "enabled" or "disabled"
         self:Notify("Watermark " .. (enabled and "Enabled" or "Disabled"), 
                    "Watermark display has been " .. status, 
                    enabled and "success" or "info")
     end)
+    
+    -- Initialize Config Manager if not already done
+    if not self.configManager then
+        local ConfigManager = loadstring(game:HttpGet("https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/ConfigManager.lua"))()
+        if ConfigManager then
+            self.configManager = ConfigManager.new()
+            
+            -- Set up callbacks
+            self.configManager:setCallbacks({
+                onConfigCreated = function(name)
+                    self:Notify("Config Created", "Config '" .. name .. "' created successfully!", "success", 3)
+                    self:updateConfigDropdown()
+                end,
+                onConfigLoaded = function(name)
+                    self:Notify("Config Loaded", "Config '" .. name .. "' loaded successfully!", "success", 3)
+                    self:updateConfigDropdown()
+                end,
+                onConfigSaved = function(name)
+                    self:Notify("Config Saved", "Config '" .. name .. "' saved successfully!", "success", 3)
+                end,
+                onConfigDeleted = function(name)
+                    self:Notify("Config Deleted", "Config '" .. name .. "' deleted successfully!", "info", 3)
+                    self:updateConfigDropdown()
+                end,
+                onError = function(operation, error)
+                    self:Notify("Config Error", error, "error", 4)
+                end
+            })
+        else
+            self:Notify("Config Error", "Failed to load Config Manager", "error", 4)
+        end
+    end
+    
+    -- Store references for config management
+    self.configElements = {}
+    
+    -- Config Name Input Field
+    self.configElements.nameInput = self:createTextInput(configSection.container, "Config Name", "Enter config name...", 10, function(text)
+        self.configElements.currentName = text
+    end)
+    
+    -- Create Config Button
+    self.configElements.createButton = self:createButton(configSection.container, "Create Config", 90, THEME.Success, function()
+        if self.configElements.currentName and self.configElements.currentName ~= "" then
+            self.configManager:createConfig(self.configElements.currentName)
+        else
+            self:Notify("Config Error", "Please enter a config name", "error", 3)
+        end
+    end)
+    
+    -- Config Dropdown
+    local configNames = {}
+    if self.configManager then
+        configNames = self.configManager:getConfigNames()
+    else
+        configNames = {"Default"}
+    end
+    
+    self.configElements.dropdown = configSection:CreateDropdown("Select Config", configNames, function(value)
+        self.configElements.selectedConfig = value
+    end)
+    
+    -- Config Action Buttons Container
+    local actionContainer = safeCreate("Frame", {
+        Size = UDim2.new(1, -20, 0, 70),
+        Position = UDim2.new(0, 10, 0, 250),
+        BackgroundTransparency = 1,
+        Parent = configSection.container
+    })
+    
+    if actionContainer then
+        -- Save Button
+        self.configElements.saveButton = self:createActionButton(actionContainer, "Save", 0, THEME.Primary, function()
+            if self.configManager and self.configElements.selectedConfig then
+                self.configManager:saveConfig(self.configElements.selectedConfig)
+            else
+                self:Notify("Config Error", "Please select a config to save", "error", 3)
+            end
+        end)
+        
+        -- Load Button
+        self.configElements.loadButton = self:createActionButton(actionContainer, "Load", 85, THEME.Accent, function()
+            if self.configManager and self.configElements.selectedConfig then
+                self.configManager:loadConfig(self.configElements.selectedConfig)
+            else
+                self:Notify("Config Error", "Please select a config to load", "error", 3)
+            end
+        end)
+        
+        -- Delete Button
+        self.configElements.deleteButton = self:createActionButton(actionContainer, "Delete", 170, THEME.Error, function()
+            if self.configManager and self.configElements.selectedConfig then
+                if self.configElements.selectedConfig == "Default" then
+                    self:Notify("Config Error", "Cannot delete the Default config", "error", 3)
+                    return
+                end
+                self.configManager:deleteConfig(self.configElements.selectedConfig)
+                self.configElements.selectedConfig = nil
+            else
+                self:Notify("Config Error", "Please select a config to delete", "error", 3)
+            end
+        end)
+        
+        -- Reset Button
+        self.configElements.resetButton = self:createActionButton(actionContainer, "Reset", 255, THEME.Warning, function()
+            if self.configManager then
+                self.configManager:resetToDefault()
+                self:Notify("Settings Reset", "All settings reset to default values", "info", 3)
+            end
+        end)
+    end
+    
     -- Move settings tab button to bottom left with gear icon
     if settingsTab.button then
         -- Update button styling for settings
