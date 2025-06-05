@@ -1,5 +1,5 @@
 --[[
-    Radiant GUI Library v1.0
+    Lynix GUI Library v1.0
     A professional, secure Roblox Lua GUI Library
     
     Features:
@@ -121,7 +121,7 @@ function NotificationManager:createContainer()
     end
     
     local screenGui = safeCreate("ScreenGui", {
-        Name = "RadiantNotifications_" .. math.random(10000, 99999),
+        Name = "LynixNotifications_" .. math.random(10000, 99999),
         ResetOnSpawn = false,
         IgnoreGuiInset = true,
         Parent = CoreGui
@@ -392,7 +392,7 @@ end
 function WatermarkManager:createWatermark()
     -- Create watermark ScreenGui
     local watermarkGui = safeCreate("ScreenGui", {
-        Name = "RadiantWatermark_" .. math.random(10000, 99999),
+        Name = "LynixWatermark_" .. math.random(10000, 99999),
         ResetOnSpawn = false,
         IgnoreGuiInset = true,
         Parent = CoreGui
@@ -459,7 +459,7 @@ local gradient = safeCreate("UIGradient", {
         })
     end
     
-    -- Brand section (Radiant)
+    -- Brand section (Lynix)
     local brandFrame = safeCreate("Frame", {
         Size = UDim2.new(0, 100, 1, -10),
         Position = UDim2.new(0, 15, 0, 8),
@@ -468,12 +468,12 @@ local gradient = safeCreate("UIGradient", {
     })
     
     if brandFrame then
-        -- Radiant logo/text
+        -- Lynix logo/text
         local brandText = safeCreate("TextLabel", {
             Size = UDim2.new(1, 0, 0, 25),
             Position = UDim2.new(0, 0, 0, 5),
             BackgroundTransparency = 1,
-            Text = "Radiant",
+            Text = "Lynix",
             TextColor3 = THEME.Primary,
             TextSize = 18,
             Font = Enum.Font.GothamBold,
@@ -745,7 +745,7 @@ function GuiLibrary.new(title)
     local isValid, error = validateInput(title, "string")
     if not isValid then
         warn("Invalid GUI title: " .. error)
-        title = "Radiant GUI"
+        title = "Lynix GUI"
     end
     
     local self = setmetatable({}, GuiLibrary)
@@ -770,7 +770,7 @@ end
 function GuiLibrary:createGUI()
     -- Create main ScreenGui
     self.screenGui = safeCreate("ScreenGui", {
-        Name = "RadiantGUI_" .. math.random(10000, 99999),
+        Name = "LynixGUI_" .. math.random(10000, 99999),
         ResetOnSpawn = false,
         IgnoreGuiInset = true,
         Parent = CoreGui
@@ -1061,9 +1061,7 @@ function GuiLibrary:createSettingsTab()
     end
 end
 
--- SCHRITT 1: Finde diese Funktion in der Library und ersetze sie komplett:
-
-function GuiLibrary:CreateTab(name, iconId)
+function GuiLibrary:CreateTab(name)
     local isValid, error = validateInput(name, "string")
     if not isValid then
         warn("Invalid tab name: " .. error)
@@ -1072,7 +1070,6 @@ function GuiLibrary:CreateTab(name, iconId)
     
     local tab = {
         name = name,
-        iconId = iconId, -- NEU: Icon ID speichern
         sections = {},
         content = nil,
         button = nil,
@@ -1098,18 +1095,18 @@ function GuiLibrary:CreateTab(name, iconId)
         tab.button = safeCreate("TextButton", {
             Name = name .. "Tab",
             Size = UDim2.new(0, 45, 0, 45),
-            Position = UDim2.new(0, 10, 0, 15),
-            BackgroundTransparency = 1,
+            Position = UDim2.new(0, 10, 0, 15), -- Position within settings area
+            BackgroundTransparency = 1, -- TRANSPARENT BACKGROUND
             BorderSizePixel = 0,
             Text = "",
-            Parent = self.settingsArea
+            Parent = self.settingsArea -- Use settings area instead of sidebar
         })
     else
         -- Normal tabs go in the tab container, positioned from top
         tab.button = safeCreate("TextButton", {
             Name = name .. "Tab",
             Size = UDim2.new(1, -10, 0, 45),
-            Position = UDim2.new(0, 5, 0, (tabIndex - 1) * 50),
+            Position = UDim2.new(0, 5, 0, (tabIndex - 1) * 50), -- ZURÜCK ZU NORMAL: Keine +10!
             BackgroundColor3 = THEME.SurfaceLight,
             BorderSizePixel = 0,
             Text = "",
@@ -1124,55 +1121,24 @@ function GuiLibrary:CreateTab(name, iconId)
         })
         
         if not isSettingsTab then
-            -- NEU: Icon und Text Layout für normale Tabs
-            if iconId then
-                -- Mit Icon Layout
-                local iconFrame = safeCreate("ImageLabel", {
-                    Size = UDim2.new(0, 20, 0, 20),
-                    Position = UDim2.new(0, 15, 0.5, -10),
-                    BackgroundTransparency = 1,
-                    Image = "rbxassetid://" .. iconId,
-                    ImageColor3 = THEME.TextSecondary,
-                    ScaleType = Enum.ScaleType.Fit,
-                    Parent = tab.button
-                })
-                
-                local textLabel = safeCreate("TextLabel", {
-                    Size = UDim2.new(1, -45, 1, 0),
-                    Position = UDim2.new(0, 40, 0, 0),
-                    BackgroundTransparency = 1,
-                    Text = name,
-                    TextColor3 = THEME.TextSecondary,
-                    TextSize = 14,
-                    Font = Enum.Font.GothamMedium,
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    TextYAlignment = Enum.TextYAlignment.Center,
-                    Parent = tab.button
-                })
-                
-                -- Icon als Property speichern für spätere Verwendung
-                tab.iconFrame = iconFrame
-            else
-                -- Ohne Icon Layout (Original)
-                local textLabel = safeCreate("TextLabel", {
-                    Size = UDim2.new(1, -20, 1, 0),
-                    Position = UDim2.new(0, 10, 0, 0),
-                    BackgroundTransparency = 1,
-                    Text = name,
-                    TextColor3 = THEME.TextSecondary,
-                    TextSize = 14,
-                    Font = Enum.Font.GothamMedium,
-                    TextXAlignment = Enum.TextXAlignment.Left,
-                    Parent = tab.button
-                })
-            end
+            local textLabel = safeCreate("TextLabel", {
+                Size = UDim2.new(1, -20, 1, 0),
+                Position = UDim2.new(0, 10, 0, 0),
+                BackgroundTransparency = 1,
+                Text = name,
+                TextColor3 = THEME.TextSecondary,
+                TextSize = 14,
+                Font = Enum.Font.GothamMedium,
+                TextXAlignment = Enum.TextXAlignment.Left,
+                Parent = tab.button
+            })
         else
             -- Add gear icon for settings tab
             local gearIcon = safeCreate("TextLabel", {
                 Size = UDim2.new(1, 0, 1, 0),
                 BackgroundTransparency = 1,
                 Text = "⚙",
-                TextColor3 = THEME.Primary,
+                TextColor3 = THEME.Primary, -- BLUE GEAR
                 TextSize = 20,
                 Font = Enum.Font.GothamBold,
                 TextXAlignment = Enum.TextXAlignment.Center,
@@ -1185,14 +1151,13 @@ function GuiLibrary:CreateTab(name, iconId)
             self:switchToTab(tab)
         end)
         
-        -- NEU: Hover-Effekte für Icons
         tab.button.MouseEnter:Connect(function()
             if self.currentTab ~= tab then
                 if isSettingsTab then
                     local gearIcon = tab.button:FindFirstChildOfClass("TextLabel")
                     if gearIcon then
                         TweenService:Create(gearIcon, ANIMATIONS.Fast, {
-                            TextColor3 = THEME.Accent,
+                            TextColor3 = THEME.Accent, -- Lighter blue on hover
                             TextSize = 22
                         }):Play()
                     end
@@ -1200,13 +1165,6 @@ function GuiLibrary:CreateTab(name, iconId)
                     TweenService:Create(tab.button, ANIMATIONS.Fast, {
                         BackgroundColor3 = THEME.Border
                     }):Play()
-                    
-                    -- Icon hover effect
-                    if tab.iconFrame then
-                        TweenService:Create(tab.iconFrame, ANIMATIONS.Fast, {
-                            ImageColor3 = THEME.Primary
-                        }):Play()
-                    end
                 end
             end
         end)
@@ -1217,7 +1175,7 @@ function GuiLibrary:CreateTab(name, iconId)
                     local gearIcon = tab.button:FindFirstChildOfClass("TextLabel")
                     if gearIcon then
                         TweenService:Create(gearIcon, ANIMATIONS.Fast, {
-                            TextColor3 = THEME.Primary,
+                            TextColor3 = THEME.Primary, -- Back to blue
                             TextSize = 20
                         }):Play()
                     end
@@ -1225,13 +1183,6 @@ function GuiLibrary:CreateTab(name, iconId)
                     TweenService:Create(tab.button, ANIMATIONS.Fast, {
                         BackgroundColor3 = THEME.SurfaceLight
                     }):Play()
-                    
-                    -- Icon leave effect
-                    if tab.iconFrame then
-                        TweenService:Create(tab.iconFrame, ANIMATIONS.Fast, {
-                            ImageColor3 = THEME.TextSecondary
-                        }):Play()
-                    end
                 end
             end
         end)
@@ -1245,6 +1196,7 @@ function GuiLibrary:CreateTab(name, iconId)
                 normalTabCount = normalTabCount + 1
             end
         end
+        -- Account for the spacing (50px per tab)
         self.tabContainer.CanvasSize = UDim2.new(0, 0, 0, normalTabCount * 50 + 60)
     end
     
@@ -1254,6 +1206,7 @@ function GuiLibrary:CreateTab(name, iconId)
     if #self.tabs == 1 and not isSettingsTab then
         self:switchToTab(tab)
     elseif #self.tabs == 2 and isSettingsTab then
+        -- If we just added settings as second tab, switch to first tab
         for _, existingTab in pairs(self.tabs) do
             if existingTab.name ~= "Settings" then
                 self:switchToTab(existingTab)
@@ -1286,7 +1239,7 @@ function GuiLibrary:CreateTab(name, iconId)
         local xPos = sectionIndex == 1 and 10 or 360
         local width = 320
         
-        section.container = self.tab.library:createSection(self.content, sectionName, xPos, width)
+        section.container = self.library:createSection(self.content, sectionName, xPos, width)
         
         table.insert(self.sections, section)
         
@@ -2229,8 +2182,6 @@ function GuiLibrary:createKeybind(parent, title, default, yPos, callback)
     return container
 end
 
--- SCHRITT 2: Finde die switchToTab Funktion und ersetze sie mit dieser verbesserten Version:
-
 function GuiLibrary:switchToTab(tab)
     if self.currentTab == tab then return end
     
@@ -2263,12 +2214,6 @@ function GuiLibrary:switchToTab(tab)
                         TextColor3 = THEME.TextSecondary
                     }):Play()
                 end
-                -- NEU: Icon color reset
-                if existingTab.iconFrame then
-                    TweenService:Create(existingTab.iconFrame, ANIMATIONS.Fast, {
-                        ImageColor3 = THEME.TextSecondary
-                    }):Play()
-                end
             end
         end
     end
@@ -2287,7 +2232,7 @@ function GuiLibrary:switchToTab(tab)
             local gearIcon = tab.button:FindFirstChildOfClass("TextLabel")
             if gearIcon then
                 TweenService:Create(gearIcon, ANIMATIONS.Fast, {
-                    TextColor3 = THEME.Accent
+                    TextColor3 = THEME.Accent -- Brighter blue when active
                 }):Play()
             end
         else
@@ -2297,12 +2242,6 @@ function GuiLibrary:switchToTab(tab)
             if textLabel then
                 TweenService:Create(textLabel, ANIMATIONS.Fast, {
                     TextColor3 = Color3.fromRGB(255, 255, 255)
-                }):Play()
-            end
-            -- NEU: Icon color for active tab
-            if tab.iconFrame then
-                TweenService:Create(tab.iconFrame, ANIMATIONS.Fast, {
-                    ImageColor3 = Color3.fromRGB(255, 255, 255)
                 }):Play()
             end
         end
@@ -2456,6 +2395,6 @@ return {
     
     -- Version info
     VERSION = "1.0.0",
-    AUTHOR = "Radiant Development",
+    AUTHOR = "Lynix Development",
     DESCRIPTION = "Professional Roblox GUI Library with advanced security and modern design"
 }
