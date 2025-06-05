@@ -1061,7 +1061,9 @@ function GuiLibrary:createSettingsTab()
     end
 end
 
-function GuiLibrary:CreateTab(name)
+-- SCHRITT 1: Finde diese Funktion in der Library und ersetze sie komplett:
+
+function GuiLibrary:CreateTab(name, iconId)
     local isValid, error = validateInput(name, "string")
     if not isValid then
         warn("Invalid tab name: " .. error)
@@ -1070,6 +1072,7 @@ function GuiLibrary:CreateTab(name)
     
     local tab = {
         name = name,
+        iconId = iconId, -- NEU: Icon ID speichern
         sections = {},
         content = nil,
         button = nil,
@@ -1095,18 +1098,18 @@ function GuiLibrary:CreateTab(name)
         tab.button = safeCreate("TextButton", {
             Name = name .. "Tab",
             Size = UDim2.new(0, 45, 0, 45),
-            Position = UDim2.new(0, 10, 0, 15), -- Position within settings area
-            BackgroundTransparency = 1, -- TRANSPARENT BACKGROUND
+            Position = UDim2.new(0, 10, 0, 15),
+            BackgroundTransparency = 1,
             BorderSizePixel = 0,
             Text = "",
-            Parent = self.settingsArea -- Use settings area instead of sidebar
+            Parent = self.settingsArea
         })
     else
         -- Normal tabs go in the tab container, positioned from top
         tab.button = safeCreate("TextButton", {
             Name = name .. "Tab",
             Size = UDim2.new(1, -10, 0, 45),
-            Position = UDim2.new(0, 5, 0, (tabIndex - 1) * 50), -- ZURÜCK ZU NORMAL: Keine +10!
+            Position = UDim2.new(0, 5, 0, (tabIndex - 1) * 50),
             BackgroundColor3 = THEME.SurfaceLight,
             BorderSizePixel = 0,
             Text = "",
@@ -1121,24 +1124,55 @@ function GuiLibrary:CreateTab(name)
         })
         
         if not isSettingsTab then
-            local textLabel = safeCreate("TextLabel", {
-                Size = UDim2.new(1, -20, 1, 0),
-                Position = UDim2.new(0, 10, 0, 0),
-                BackgroundTransparency = 1,
-                Text = name,
-                TextColor3 = THEME.TextSecondary,
-                TextSize = 14,
-                Font = Enum.Font.GothamMedium,
-                TextXAlignment = Enum.TextXAlignment.Left,
-                Parent = tab.button
-            })
+            -- NEU: Icon und Text Layout für normale Tabs
+            if iconId then
+                -- Mit Icon Layout
+                local iconFrame = safeCreate("ImageLabel", {
+                    Size = UDim2.new(0, 20, 0, 20),
+                    Position = UDim2.new(0, 15, 0.5, -10),
+                    BackgroundTransparency = 1,
+                    Image = "rbxassetid://" .. iconId,
+                    ImageColor3 = THEME.TextSecondary,
+                    ScaleType = Enum.ScaleType.Fit,
+                    Parent = tab.button
+                })
+                
+                local textLabel = safeCreate("TextLabel", {
+                    Size = UDim2.new(1, -45, 1, 0),
+                    Position = UDim2.new(0, 40, 0, 0),
+                    BackgroundTransparency = 1,
+                    Text = name,
+                    TextColor3 = THEME.TextSecondary,
+                    TextSize = 14,
+                    Font = Enum.Font.GothamMedium,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    TextYAlignment = Enum.TextYAlignment.Center,
+                    Parent = tab.button
+                })
+                
+                -- Icon als Property speichern für spätere Verwendung
+                tab.iconFrame = iconFrame
+            else
+                -- Ohne Icon Layout (Original)
+                local textLabel = safeCreate("TextLabel", {
+                    Size = UDim2.new(1, -20, 1, 0),
+                    Position = UDim2.new(0, 10, 0, 0),
+                    BackgroundTransparency = 1,
+                    Text = name,
+                    TextColor3 = THEME.TextSecondary,
+                    TextSize = 14,
+                    Font = Enum.Font.GothamMedium,
+                    TextXAlignment = Enum.TextXAlignment.Left,
+                    Parent = tab.button
+                })
+            end
         else
             -- Add gear icon for settings tab
             local gearIcon = safeCreate("TextLabel", {
                 Size = UDim2.new(1, 0, 1, 0),
                 BackgroundTransparency = 1,
                 Text = "⚙",
-                TextColor3 = THEME.Primary, -- BLUE GEAR
+                TextColor3 = THEME.Primary,
                 TextSize = 20,
                 Font = Enum.Font.GothamBold,
                 TextXAlignment = Enum.TextXAlignment.Center,
@@ -1151,13 +1185,14 @@ function GuiLibrary:CreateTab(name)
             self:switchToTab(tab)
         end)
         
+        -- NEU: Hover-Effekte für Icons
         tab.button.MouseEnter:Connect(function()
             if self.currentTab ~= tab then
                 if isSettingsTab then
                     local gearIcon = tab.button:FindFirstChildOfClass("TextLabel")
                     if gearIcon then
                         TweenService:Create(gearIcon, ANIMATIONS.Fast, {
-                            TextColor3 = THEME.Accent, -- Lighter blue on hover
+                            TextColor3 = THEME.Accent,
                             TextSize = 22
                         }):Play()
                     end
@@ -1165,6 +1200,13 @@ function GuiLibrary:CreateTab(name)
                     TweenService:Create(tab.button, ANIMATIONS.Fast, {
                         BackgroundColor3 = THEME.Border
                     }):Play()
+                    
+                    -- Icon hover effect
+                    if tab.iconFrame then
+                        TweenService:Create(tab.iconFrame, ANIMATIONS.Fast, {
+                            ImageColor3 = THEME.Primary
+                        }):Play()
+                    end
                 end
             end
         end)
@@ -1175,7 +1217,7 @@ function GuiLibrary:CreateTab(name)
                     local gearIcon = tab.button:FindFirstChildOfClass("TextLabel")
                     if gearIcon then
                         TweenService:Create(gearIcon, ANIMATIONS.Fast, {
-                            TextColor3 = THEME.Primary, -- Back to blue
+                            TextColor3 = THEME.Primary,
                             TextSize = 20
                         }):Play()
                     end
@@ -1183,6 +1225,13 @@ function GuiLibrary:CreateTab(name)
                     TweenService:Create(tab.button, ANIMATIONS.Fast, {
                         BackgroundColor3 = THEME.SurfaceLight
                     }):Play()
+                    
+                    -- Icon leave effect
+                    if tab.iconFrame then
+                        TweenService:Create(tab.iconFrame, ANIMATIONS.Fast, {
+                            ImageColor3 = THEME.TextSecondary
+                        }):Play()
+                    end
                 end
             end
         end)
@@ -1196,7 +1245,6 @@ function GuiLibrary:CreateTab(name)
                 normalTabCount = normalTabCount + 1
             end
         end
-        -- Account for the spacing (50px per tab)
         self.tabContainer.CanvasSize = UDim2.new(0, 0, 0, normalTabCount * 50 + 60)
     end
     
@@ -1206,7 +1254,6 @@ function GuiLibrary:CreateTab(name)
     if #self.tabs == 1 and not isSettingsTab then
         self:switchToTab(tab)
     elseif #self.tabs == 2 and isSettingsTab then
-        -- If we just added settings as second tab, switch to first tab
         for _, existingTab in pairs(self.tabs) do
             if existingTab.name ~= "Settings" then
                 self:switchToTab(existingTab)
@@ -1239,7 +1286,7 @@ function GuiLibrary:CreateTab(name)
         local xPos = sectionIndex == 1 and 10 or 360
         local width = 320
         
-        section.container = self.library:createSection(self.content, sectionName, xPos, width)
+        section.container = self.tab.library:createSection(self.content, sectionName, xPos, width)
         
         table.insert(self.sections, section)
         
@@ -2182,6 +2229,8 @@ function GuiLibrary:createKeybind(parent, title, default, yPos, callback)
     return container
 end
 
+-- SCHRITT 2: Finde die switchToTab Funktion und ersetze sie mit dieser verbesserten Version:
+
 function GuiLibrary:switchToTab(tab)
     if self.currentTab == tab then return end
     
@@ -2214,6 +2263,12 @@ function GuiLibrary:switchToTab(tab)
                         TextColor3 = THEME.TextSecondary
                     }):Play()
                 end
+                -- NEU: Icon color reset
+                if existingTab.iconFrame then
+                    TweenService:Create(existingTab.iconFrame, ANIMATIONS.Fast, {
+                        ImageColor3 = THEME.TextSecondary
+                    }):Play()
+                end
             end
         end
     end
@@ -2232,7 +2287,7 @@ function GuiLibrary:switchToTab(tab)
             local gearIcon = tab.button:FindFirstChildOfClass("TextLabel")
             if gearIcon then
                 TweenService:Create(gearIcon, ANIMATIONS.Fast, {
-                    TextColor3 = THEME.Accent -- Brighter blue when active
+                    TextColor3 = THEME.Accent
                 }):Play()
             end
         else
@@ -2242,6 +2297,12 @@ function GuiLibrary:switchToTab(tab)
             if textLabel then
                 TweenService:Create(textLabel, ANIMATIONS.Fast, {
                     TextColor3 = Color3.fromRGB(255, 255, 255)
+                }):Play()
+            end
+            -- NEU: Icon color for active tab
+            if tab.iconFrame then
+                TweenService:Create(tab.iconFrame, ANIMATIONS.Fast, {
+                    ImageColor3 = Color3.fromRGB(255, 255, 255)
                 }):Play()
             end
         end
