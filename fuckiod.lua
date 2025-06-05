@@ -1,5 +1,5 @@
 --[[
-    Lynix GUI Library v1.0
+    Radiant GUI Library v1.0
     A professional, secure Roblox Lua GUI Library
     
     Features:
@@ -121,7 +121,7 @@ function NotificationManager:createContainer()
     end
     
     local screenGui = safeCreate("ScreenGui", {
-        Name = "LynixNotifications_" .. math.random(10000, 99999),
+        Name = "RadiantNotifications_" .. math.random(10000, 99999),
         ResetOnSpawn = false,
         IgnoreGuiInset = true,
         Parent = CoreGui
@@ -392,7 +392,7 @@ end
 function WatermarkManager:createWatermark()
     -- Create watermark ScreenGui
     local watermarkGui = safeCreate("ScreenGui", {
-        Name = "LynixWatermark_" .. math.random(10000, 99999),
+        Name = "RadiantWatermark_" .. math.random(10000, 99999),
         ResetOnSpawn = false,
         IgnoreGuiInset = true,
         Parent = CoreGui
@@ -459,7 +459,7 @@ local gradient = safeCreate("UIGradient", {
         })
     end
     
-    -- Brand section (Lynix)
+    -- Brand section (Radiant)
     local brandFrame = safeCreate("Frame", {
         Size = UDim2.new(0, 100, 1, -10),
         Position = UDim2.new(0, 15, 0, 8),
@@ -468,12 +468,12 @@ local gradient = safeCreate("UIGradient", {
     })
     
     if brandFrame then
-        -- Lynix logo/text
+        -- Radiant logo/text
         local brandText = safeCreate("TextLabel", {
             Size = UDim2.new(1, 0, 0, 25),
             Position = UDim2.new(0, 0, 0, 5),
             BackgroundTransparency = 1,
-            Text = "Lynix",
+            Text = "Radiant",
             TextColor3 = THEME.Primary,
             TextSize = 18,
             Font = Enum.Font.GothamBold,
@@ -745,7 +745,7 @@ function GuiLibrary.new(title)
     local isValid, error = validateInput(title, "string")
     if not isValid then
         warn("Invalid GUI title: " .. error)
-        title = "Lynix GUI"
+        title = "Radiant GUI"
     end
     
     local self = setmetatable({}, GuiLibrary)
@@ -770,7 +770,7 @@ end
 function GuiLibrary:createGUI()
     -- Create main ScreenGui
     self.screenGui = safeCreate("ScreenGui", {
-        Name = "LynixGUI_" .. math.random(10000, 99999),
+        Name = "RadiantGUI_" .. math.random(10000, 99999),
         ResetOnSpawn = false,
         IgnoreGuiInset = true,
         Parent = CoreGui
@@ -2395,6 +2395,6 @@ return {
     
     -- Version info
     VERSION = "1.0.0",
-    AUTHOR = "Lynix Development",
+    AUTHOR = "Radiant Development",
     DESCRIPTION = "Professional Roblox GUI Library with advanced security and modern design"
 }
